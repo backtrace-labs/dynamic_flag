@@ -70,11 +70,12 @@ struct patch_count {
 	uint64_t unhook;
 };
 
-AN_ARRAY(patch_count, activation);
-
 static ck_spinlock_t patch_lock = CK_SPINLOCK_INITIALIZER;
 /* Hook records are in an array. For each hook record, count # of activations and disable calls. */
-static AN_ARRAY_INSTANCE(activation) counts;
+static struct {
+	struct patch_count *data;
+	size_t size;
+}counts = { NULL };
 
 extern const struct patch_record __start_an_hook_list[], __stop_an_hook_list[];
 
@@ -85,11 +86,12 @@ lock()
 {
 
 	ck_spinlock_lock(&patch_lock);
-	if (AN_CC_UNLIKELY(an_array_initialized_activation(&counts) == false)) {
+	if (AN_CC_UNLIKELY(counts.data == NULL)) {
 		size_t n = __stop_an_hook_list - __start_an_hook_list;
 
-		an_array_init_activation(&counts, n);
-		an_array_grow_to_activation(&counts, n, NULL);
+		counts.data = calloc(n, sizeof(*counts.data));
+		counts.size = n;
+		assert(counts.data != NULL);
 		init_all();
 	}
 
@@ -187,22 +189,19 @@ unpatch(const struct patch_record *record)
 static void
 default_patch(const struct patch_record *record)
 {
-	struct patch_count *count;
-	size_t i, n;
+	size_t i;
 
-	count = counts.values;
-	n = an_array_length_activation(&counts);
 	i = record - __start_an_hook_list;
 
-	assert(i < (size_t)n && "Hook out of bounds?!");
+	assert(i < counts.size && "Hook out of bounds?!");
 
 	switch (record->initial_opcode) {
 	case AN_HOOK_VALUE_ACTIVE:
-		count[i].activation = (record->flipped != 0) ? 0 : 1;
+		counts.data[i].activation = (record->flipped != 0) ? 0 : 1;
 		patch(record);
 		break;
 	case AN_HOOK_VALUE_INACTIVE:
-		count[i].activation = (record->flipped != 0) ? 1 : 0;
+		counts.data[i].activation = (record->flipped != 0) ? 1 : 0;
 		unpatch(record);
 		break;
 	default:
@@ -421,16 +420,14 @@ activate_all(an_array_t *arr)
 	an_array_init(&to_patch, n);
 	lock();
 	for (unsigned int i = 0; i < n; i++) {
-		struct patch_count *count;
 		const struct patch_record *record = records[i];
 		size_t offset = record - __start_an_hook_list;
 
-		count = AN_ARRAY_VALUE(activation, &counts, offset);
-		if (count->unhook > 0) {
+		if (counts.data[offset].unhook > 0) {
 			continue;
 		}
 
-		if (count->activation++ == 0) {
+		if (counts.data[offset].activation++ == 0) {
 			an_array_push(&to_patch, (void *)record);
 		}
 	}
@@ -456,12 +453,11 @@ deactivate_all(an_array_t *acc)
 	an_array_init(&to_patch, n);
 	lock();
 	for (unsigned int i = 0; i < n; i++) {
-		struct patch_count *count;
 		const struct patch_record *record = records[i];
 		size_t offset = record - __start_an_hook_list;
 
-		count = AN_ARRAY_VALUE(activation, &counts, offset);
-		if (count->activation > 0 && --count->activation == 0) {
+		if (counts.data[offset].activation > 0 &&
+		    --counts.data[offset].activation == 0) {
 			an_array_push(&to_patch, (void *)record);
 		}
 	}
@@ -484,13 +480,11 @@ rehook_all(an_array_t *arr)
 
 	lock();
 	for (unsigned int i = 0; i < n; i++) {
-		struct patch_count *count;
 		const struct patch_record *record = records[i];
 		size_t offset = record - __start_an_hook_list;
 
-		count = AN_ARRAY_VALUE(activation, &counts, offset);
-		if (count->unhook > 0) {
-			count->unhook--;
+		if (counts.data[offset].unhook > 0) {
+			counts.data[offset].unhook--;
 		}
 	}
 
@@ -511,12 +505,10 @@ unhook_all(an_array_t *arr)
 	an_array_init(&to_patch, n);
 	lock();
 	for (unsigned int i = 0; i < n; i++) {
-		struct patch_count *count;
 		const struct patch_record *record = records[i];
 		size_t offset = record - __start_an_hook_list;
 
-		count = AN_ARRAY_VALUE(activation, &counts, offset);
-		count->unhook++;
+		counts.data[offset].unhook++;
 	}
 
 	unlock();
