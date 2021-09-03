@@ -477,13 +477,11 @@ deactivate_all(an_array_t *acc)
 static size_t
 rehook_all(an_array_t *arr)
 {
-	an_array_t to_patch;
 	const struct patch_record **records;
 	unsigned int n;
 
 	records = an_array_buffer(arr, &n);
 
-	an_array_init(&to_patch, n);
 	lock();
 	for (unsigned int i = 0; i < n; i++) {
 		struct patch_count *count;
@@ -498,7 +496,6 @@ rehook_all(an_array_t *arr)
 
 	unlock();
 
-	an_array_deinit(&to_patch);
 	return n;
 }
 
