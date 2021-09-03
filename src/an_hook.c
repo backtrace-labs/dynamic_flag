@@ -70,6 +70,13 @@ struct patch_count {
 	uint64_t unhook;
 };
 
+
+struct patch_list {
+	size_t size;
+	size_t capacity;
+	const struct patch_record *data[];
+};
+
 static ck_spinlock_t patch_lock = CK_SPINLOCK_INITIALIZER;
 /* Hook records are in an array. For each hook record, count # of activations and disable calls. */
 static struct {
@@ -80,6 +87,40 @@ static struct {
 extern const struct patch_record __start_an_hook_list[], __stop_an_hook_list[];
 
 static void init_all();
+
+static struct patch_list *
+patch_list_create(void)
+{
+	struct patch_list *list;
+
+	assert(counts.size > 0  && "Must initialize an_hook first");
+	list = calloc(1, sizeof(*list->data) + counts.size * sizeof(list->data[0]));
+	assert(list != NULL);
+	list->size = 0;
+	list->capacity = counts.size;
+	return list;
+}
+
+static void
+patch_list_destroy(struct patch_list *list)
+{
+
+	if (list == NULL) {
+		return;
+	}
+
+	free(list);
+	return;
+}
+
+static void
+patch_list_push(struct patch_list *list, const struct patch_record *record)
+{
+
+	assert(list->size < list->capacity);
+	list->data[list->size++] = record;
+	return;
+}
 
 static void
 lock()
@@ -243,7 +284,8 @@ deactivate(const struct patch_record *record)
 }
 
 static void
-amortize(const struct patch_record **records, size_t n, void (*cb)(const struct patch_record *))
+amortize(const struct patch_list *records,
+    void (*cb)(const struct patch_record *))
 {
 	uintptr_t first_page = UINTPTR_MAX;
 	uintptr_t last_page = 0;
@@ -258,7 +300,7 @@ amortize(const struct patch_record **records, size_t n, void (*cb)(const struct 
 			    (1 + last_page - first_page) * page_size,	\
 			    PROT_READ | PROT_WRITE | PROT_EXEC);	\
 			for (size_t j = section_begin; j < i; j++) {	\
-				cb(records[j]);				\
+				cb(records->data[j]);				\
 			}						\
 									\
 			mprotect((void *)(first_page * page_size),	\
@@ -267,8 +309,8 @@ amortize(const struct patch_record **records, size_t n, void (*cb)(const struct 
 		}							\
 	} while (0)
 
-	for (i = 0; i < n; i++) {
-		const struct patch_record *record = records[i];
+	for (i = 0; i < records->size; i++) {
+		const struct patch_record *record = records->data[i];
 		uintptr_t begin_page = (uintptr_t)record->hook / page_size;
 		uintptr_t end_page = ((uintptr_t)record->hook + HOOK_SIZE - 1) / page_size;
 
@@ -289,12 +331,11 @@ amortize(const struct patch_record **records, size_t n, void (*cb)(const struct 
 }
 
 static int
-find_records(const char *pattern, an_array_t *acc)
+find_records(const char *pattern, struct patch_list *acc)
 {
 	regex_t regex;
 	size_t n = __stop_an_hook_list - __start_an_hook_list;
 
-	an_array_init(acc, 16);
 	if (regcomp(&regex, pattern, REG_EXTENDED | REG_NOSUB) != 0) {
 		return -1;
 	}
@@ -303,7 +344,7 @@ find_records(const char *pattern, an_array_t *acc)
 		const struct patch_record *record = __start_an_hook_list + i;
 
 		if (regexec(&regex, record->name, 0, NULL, 0) != REG_NOMATCH) {
-			an_array_push(acc, (void *)record);
+			patch_list_push(acc, record);
 		}
 	}
 
@@ -313,12 +354,11 @@ find_records(const char *pattern, an_array_t *acc)
 
 static int
 find_records_kind(const void **start, const void **end, const char *pattern,
-    an_array_t *acc)
+    struct patch_list *acc)
 {
 	regex_t regex;
 	size_t n = end - start;
 
-	an_array_init(acc, 16);
 	if (pattern != NULL && regcomp(&regex, pattern, REG_EXTENDED | REG_NOSUB) != 0) {
 		return -1;
 	}
@@ -328,7 +368,7 @@ find_records_kind(const void **start, const void **end, const char *pattern,
 
 		if (pattern == NULL ||
 		    regexec(&regex, record->name, 0, NULL, 0) != REG_NOMATCH) {
-			an_array_push(acc, (void *)record);
+			patch_list_push(acc, record);
 		}
 	}
 
@@ -392,35 +432,31 @@ cmp_patches_alpha(const void *x, const void *y)
 static void
 init_all()
 {
-	const struct patch_record **records;
-	an_array_t acc;
-	unsigned int n;
+	struct patch_list *acc;
 	int r;
 
-	r = find_records("", &acc);
+	acc = patch_list_create();
+	r = find_records("", acc);
 	assert(r == 0 && "an_hook init failed.");
 
-	records = an_array_buffer(&acc, &n);
-	qsort(records, n, sizeof(struct patch_record *), cmp_patches);
-	amortize(records, n, default_patch);
-	an_array_deinit(&acc);
+	qsort(acc->data, acc->size, sizeof(acc->data[0]), cmp_patches);
+	amortize(acc, default_patch);
+	patch_list_destroy(acc);
 	return;
 }
 
 static size_t
-activate_all(an_array_t *arr)
+activate_all(struct patch_list *arr)
 {
-	an_array_t to_patch;
-	const struct patch_record **records;
-	unsigned int n;
+	struct patch_list *to_patch;
+	size_t to_patch_count;
 
-	records = an_array_buffer(arr, &n);
-	qsort(records, n, sizeof(struct patch_record *), cmp_patches);
+	qsort(arr->data, arr->size, sizeof(struct patch_record *), cmp_patches);
 
-	an_array_init(&to_patch, n);
+	to_patch = patch_list_create();
 	lock();
-	for (unsigned int i = 0; i < n; i++) {
-		const struct patch_record *record = records[i];
+	for (size_t i = 0; i < arr->size; i++) {
+		const struct patch_record *record = arr->data[i];
 		size_t offset = record - __start_an_hook_list;
 
 		if (counts.data[offset].unhook > 0) {
@@ -428,59 +464,54 @@ activate_all(an_array_t *arr)
 		}
 
 		if (counts.data[offset].activation++ == 0) {
-			an_array_push(&to_patch, (void *)record);
+			patch_list_push(to_patch, record);
 		}
 	}
 
-	records = an_array_buffer(&to_patch, &n);
-	amortize(records, n, activate);
+	amortize(to_patch, activate);
 	unlock();
 
-	an_array_deinit(&to_patch);
-	return n;
+	to_patch_count = to_patch->size;
+	patch_list_destroy(to_patch);
+	return to_patch_count;
 }
 
 static size_t
-deactivate_all(an_array_t *acc)
+deactivate_all(struct patch_list *records)
 {
-	an_array_t to_patch;
-	const struct patch_record **records;
-	unsigned int n;
+	struct patch_list *to_patch;
+	size_t to_patch_count;
 
-	records = an_array_buffer(acc, &n);
-	qsort(records, n, sizeof(struct patch_record *), cmp_patches);
+	qsort(records->data, records->size,
+	    sizeof(struct patch_record *), cmp_patches);
 
-	an_array_init(&to_patch, n);
+	to_patch = patch_list_create();
 	lock();
-	for (unsigned int i = 0; i < n; i++) {
-		const struct patch_record *record = records[i];
+	for (size_t i = 0; i < records->size; i++) {
+		const struct patch_record *record = records->data[i];
 		size_t offset = record - __start_an_hook_list;
 
 		if (counts.data[offset].activation > 0 &&
 		    --counts.data[offset].activation == 0) {
-			an_array_push(&to_patch, (void *)record);
+			patch_list_push(to_patch, record);
 		}
 	}
 
-	records = an_array_buffer(&to_patch, &n);
-	amortize(records, n, deactivate);
+	amortize(to_patch, deactivate);
 	unlock();
 
-	an_array_deinit(&to_patch);
-	return n;
+	to_patch_count = to_patch->size;
+	patch_list_destroy(to_patch);
+	return to_patch_count;
 }
 
 static size_t
-rehook_all(an_array_t *arr)
+rehook_all(struct patch_list *records)
 {
-	const struct patch_record **records;
-	unsigned int n;
-
-	records = an_array_buffer(arr, &n);
 
 	lock();
-	for (unsigned int i = 0; i < n; i++) {
-		const struct patch_record *record = records[i];
+	for (size_t i = 0; i < records->size; i++) {
+		const struct patch_record *record = records->data[i];
 		size_t offset = record - __start_an_hook_list;
 
 		if (counts.data[offset].unhook > 0) {
@@ -490,22 +521,16 @@ rehook_all(an_array_t *arr)
 
 	unlock();
 
-	return n;
+	return records->size;
 }
 
 static size_t
-unhook_all(an_array_t *arr)
+unhook_all(struct patch_list *records)
 {
-	an_array_t to_patch;
-	const struct patch_record **records;
-	unsigned int n;
 
-	records = an_array_buffer(arr, &n);
-
-	an_array_init(&to_patch, n);
 	lock();
-	for (unsigned int i = 0; i < n; i++) {
-		const struct patch_record *record = records[i];
+	for (size_t i = 0; i < records->size; i++) {
+		const struct patch_record *record = records->data[i];
 		size_t offset = record - __start_an_hook_list;
 
 		counts.data[offset].unhook++;
@@ -513,115 +538,120 @@ unhook_all(an_array_t *arr)
 
 	unlock();
 
-	an_array_deinit(&to_patch);
-	return n;
+	return records->size;
 }
 
 int
 an_hook_activate(const char *regex)
 {
-	an_array_t acc;
+	struct patch_list *acc;
 	int r;
 
-	r = find_records(regex, &acc);
+	acc = patch_list_create();
+	r = find_records(regex, acc);
 	if (r != 0) {
 		goto out;
 	}
 
-	activate_all(&acc);
+	activate_all(acc);
 
 out:
-	an_array_deinit(&acc);
+	patch_list_destroy(acc);
 	return r;
 }
 
 int
 an_hook_deactivate(const char *regex)
 {
-	an_array_t acc;
+	struct patch_list *acc;
 	int r;
 
-	r = find_records(regex, &acc);
+	acc = patch_list_create();
+	r = find_records(regex, acc);
 	if (r != 0) {
 		goto out;
 	}
 
-	deactivate_all(&acc);
+	deactivate_all(acc);
 
 out:
-	an_array_deinit(&acc);
+	patch_list_destroy(acc);
 	return r;
 }
 
 int
 an_hook_unhook(const char *regex)
 {
-	an_array_t acc;
+	struct patch_list *acc;
 	int r;
 
-	r = find_records(regex, &acc);
+	acc = patch_list_create();
+	r = find_records(regex, acc);
 	if (r != 0) {
 		goto out;
 	}
 
-	unhook_all(&acc);
+	unhook_all(acc);
 
 out:
-	an_array_deinit(&acc);
+	patch_list_destroy(acc);
 	return r;
 }
 
 int
 an_hook_rehook(const char *regex)
 {
-	an_array_t acc;
+	struct patch_list *acc;
 	int r;
 
-	r = find_records(regex, &acc);
+	acc = patch_list_create();
+	r = find_records(regex, acc);
 	if (r != 0) {
 		goto out;
 	}
 
-	rehook_all(&acc);
+	rehook_all(acc);
 
 out:
-	an_array_deinit(&acc);
+	patch_list_destroy(acc);
 	return r;
 }
 
 int
 an_hook_activate_kind_inner(const void **start, const void **end, const char *regex)
 {
-	an_array_t acc;
+	struct patch_list *acc;
 	int r;
 
-	r = find_records_kind(start, end, regex, &acc);
+	acc = patch_list_create();
+	r = find_records_kind(start, end, regex, acc);
 	if (r != 0) {
 		goto out;
 	}
 
-	activate_all(&acc);
+	activate_all(acc);
 
 out:
-	an_array_deinit(&acc);
+	patch_list_destroy(acc);
 	return r;
 }
 
 int
 an_hook_deactivate_kind_inner(const void **start, const void **end, const char *regex)
 {
-	an_array_t acc;
+	struct patch_list *acc;
 	int r;
 
-	r = find_records_kind(start, end, regex, &acc);
+	acc = patch_list_create();
+	r = find_records_kind(start, end, regex, acc);
 	if (r != 0) {
 		goto out;
 	}
 
-	deactivate_all(&acc);
+	deactivate_all(acc);
 
 out:
-	an_array_deinit(&acc);
+	patch_list_destroy(acc);
 	return r;
 }
 
