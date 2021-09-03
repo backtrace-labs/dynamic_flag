@@ -1,29 +1,29 @@
 
-anhook_src_dir = 'src'
-anhook_include_dir = include_directories('include')
+an_hook_src_dir = 'src'
+an_hook_include_dir = include_directories('include')
 
-anhook_src_files = '''
+an_hook_src_files = '''
 	an_hook.c
 '''.split()
 
-_anhook_src_files = []
-foreach s : anhook_src_files
-	_anhook_src_files += join_paths(anhook_src_dir, s)
+_an_hook_src_files = []
+foreach s : an_hook_src_files
+	_an_hook_src_files += join_paths(an_hook_src_dir, s)
 endforeach
 
-anhook_c_args = [
+an_hook_c_args = [
 	'-Wno-unused-function', '-Wno-missing-prototypes',
 	'-Wno-missing-declarations',
 ]
 
-anhook_lib = static_library('anhook', _anhook_src_files,
-	include_directories: anhook_include_dir,
+an_hook_lib = static_library('an_hook', _an_hook_src_files,
+	include_directories: an_hook_include_dir,
 	dependencies: [libck_dep, ],
-	c_args: anhook_c_args)
+	c_args: an_hook_c_args)
 
-libanhook_dep = declare_dependency(link_whole: anhook_lib,
-	include_directories: anhook_include_dir)
+liban_hook_dep = declare_dependency(link_whole: an_hook_lib,
+	include_directories: an_hook_include_dir)
 
-executable('anhook_test_feature_flags', 'tests/feature_flags.c',
-	dependencies: [libanhook_dep],
+executable('an_hook_test_feature_flags', 'tests/feature_flags.c',
+	dependencies: [liban_hook_dep],
 	link_language: 'c', install: false)
