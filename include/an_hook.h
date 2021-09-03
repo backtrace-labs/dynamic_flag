@@ -9,8 +9,6 @@
 # endif
 #endif
 
-#include "an_cc.h"
-
 #if !AN_HOOK_ENABLED
 
 #define AN_HOOK(KIND, NAME) if (1)
@@ -124,7 +122,7 @@ an_hook_rehook(const char *regex)
 #define AN_HOOK_VALUE_INACTIVE 0xa9 /* testl $, %eax */
 
 #define AN_HOOK_IMPL_(OPCODE, INITIAL, FLIPPED, KIND, NAME, FILE, LINE, GENSYM)	\
-	if (AN_CC_UNLIKELY(({						\
+	if (__builtin_expect(({						\
 	    asm goto ("1:\n\t"						\
 		      ".byte "#OPCODE"\n\t"				\
 		      ".long %l[an_hook_"#GENSYM"_label] - (1b + 5)\n\t"\
@@ -147,7 +145,7 @@ an_hook_rehook(const char *regex)
 		      ".quad 3b\n\t"					\
 		      ".popsection"					\
 		      ::: "cc" : an_hook_##GENSYM##_label);		\
-	    0;})))							\
+	    0;}), 0))							\
 	an_hook_##GENSYM##_label:
 #else /* Fallback implementation */
 /*
@@ -158,7 +156,7 @@ an_hook_rehook(const char *regex)
 #define AN_HOOK_VALUE_INACTIVE 0
 
 #define AN_HOOK_IMPL_(DEFAULT, INITIAL, FLIPPED, KIND, NAME, FILE, LINE, GENSYM) \
-	if (AN_CC_UNLIKELY(({						\
+	if (__builtin_expect(({						\
 	    uint8_t r;							\
 	    asm ("1:\n\t"						\
 		 "movb $"#DEFAULT", %0\n\t"				\
@@ -181,7 +179,7 @@ an_hook_rehook(const char *regex)
 		 ".quad 3b\n\t"						\
 		 ".popsection"						\
 		:"=r"(r));						\
-	    r;})))
+	    r;}), 0))
 #endif /* AN_HOOK_FALLBACK */
 
 #define AN_HOOK_IMPL(OPCODE, INITIAL, FLIPPED, KIND, NAME, FILE, LINE, GENSYM) \

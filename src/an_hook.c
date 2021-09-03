@@ -32,7 +32,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "an_cc.h"
 #include "an_hook.h"
 
 #if !AN_HOOK_ENABLED
@@ -127,7 +126,7 @@ lock(void)
 {
 
 	ck_spinlock_lock(&patch_lock);
-	if (AN_CC_UNLIKELY(counts.data == NULL)) {
+	if (__builtin_expect((counts.data == NULL), 0)) {
 		size_t n = __stop_an_hook_list - __start_an_hook_list;
 
 		counts.data = calloc(n, sizeof(*counts.data));
@@ -148,7 +147,7 @@ unlock(void)
 }
 
 /* Make sure there's at least one hook point. */
-AN_CC_USED static void
+__attribute__((__used__)) static void
 dummy(void)
 {
 
