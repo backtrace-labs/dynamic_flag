@@ -39,7 +39,7 @@
 
 /* dummy stubs */
 void
-an_hook_init_lib()
+an_hook_init_lib(void)
 {
 
 	return;
@@ -86,7 +86,7 @@ static struct {
 
 extern const struct patch_record __start_an_hook_list[], __stop_an_hook_list[];
 
-static void init_all();
+static void init_all(void);
 
 static struct patch_list *
 patch_list_create(void)
@@ -123,7 +123,7 @@ patch_list_push(struct patch_list *list, const struct patch_record *record)
 }
 
 static void
-lock()
+lock(void)
 {
 
 	ck_spinlock_lock(&patch_lock);
@@ -140,7 +140,7 @@ lock()
 }
 
 static void
-unlock()
+unlock(void)
 {
 
 	ck_spinlock_unlock(&patch_lock);
@@ -149,7 +149,7 @@ unlock()
 
 /* Make sure there's at least one hook point. */
 AN_CC_USED static void
-dummy()
+dummy(void)
 {
 
 	AN_HOOK_DUMMY(none);
@@ -434,7 +434,7 @@ cmp_patches_alpha(const void *x, const void *y)
 
 
 static void
-init_all()
+init_all(void)
 {
 	struct patch_list *acc;
 	int r;
@@ -660,7 +660,7 @@ out:
 }
 
 void
-an_hook_init_lib()
+an_hook_init_lib(void)
 {
 
 	lock();
