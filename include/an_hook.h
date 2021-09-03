@@ -157,7 +157,7 @@ an_hook_rehook(const char *regex)
 
 #define AN_HOOK_IMPL_(DEFAULT, INITIAL, FLIPPED, KIND, NAME, FILE, LINE, GENSYM) \
 	if (__builtin_expect(({						\
-	    uint8_t r;							\
+	    unsigned char r;						\
 	    asm ("1:\n\t"						\
 		 "movb $"#DEFAULT", %0\n\t"				\
 									\
