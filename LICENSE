@@ -200,37 +200,3 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-
-BUNDLED SUBCOMPONENTS:
-
-The HTTP parser in common/net/protocol/http-parser is Copyright 2009,
-NGINX, Joyent, Inc., and other Node contributors, under the MIT
-(Expat) license.  See common/net/protocol/http-parser/LICENSE-MIT.
-
-common/an_qsort.inc is based on FreeBSD code Copyright 1992-2015, The
-FreeBSD Project, under the 2-clause BSD license.  AppNexus's
-modifications are available under the Apache 2.0 license.
-
-cmake/FindCheck.cmake is Copyright 2007 Daniel Gollub, 2007-2009
-Bjoern Ricks, available under the 3-clause BSD license.
-
-Files common/x86_64/cpuid.[ch] are based on http://repnop.org/cpuid.html,
-Copyright 2009-2011 Samy Al Bahra, available under the 2-clause BSD
-license. AppNexus's modifications are available under the Apache 2.0
-license.
-
-Files include/an_charset.h and src/an_charset.c are cut down versions
-of CCAN code
-(https://github.com/rustyrussell/ccan/blob/master/ccan/charset/charset.h)
-Copyright 2011 Joseph A. Adams, under the MIT (Expat) license.
-
-Parts of include/an_cc.h were copied from the CCAN project's
-https://github.com/rustyrussell/ccan/blob/master/ccan/array_size/array_size.h
-and
-https://github.com/rustyrussell/ccan/blob/master/ccan/build_assert/build_assert.h.
-That code is available under the Creative Commons CC0 license.
-
-Files: cmake/Findcodecov.cmake, cmake/FindGcov.cmake, cmake/FindLcov.cmake, cmake/llvm-cov-wrapper
-Copyright: 2015-2017 RWTH Aachen University, Federal Republic of Germany
-License: BSD-3-clause
-See: https://github.com/RWTH-HPC/CMake-codecov
