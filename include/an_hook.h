@@ -9,9 +9,7 @@
 # endif
 #endif
 
-#include <evhttp.h>
-
-#include "common/an_cc.h"
+#include "an_cc.h"
 
 #if !AN_HOOK_ENABLED
 

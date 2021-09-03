@@ -19,7 +19,6 @@
 #endif
 
 #include <assert.h>
-#include <evhttp.h>
 #include <ck_spinlock.h>
 #include <dlfcn.h>
 #include <inttypes.h>
@@ -33,11 +32,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "common/an_array.h"
-#include "common/an_handler.h"
-#include "common/an_hook.h"
-#include "common/util.h"
-#include "common/libevent_extras.h"
+#include "an_cc.h"
+#include "an_hook.h"
 
 #if !AN_HOOK_ENABLED
 
