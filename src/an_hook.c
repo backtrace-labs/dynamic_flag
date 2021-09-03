@@ -94,7 +94,7 @@ patch_list_create(void)
 	struct patch_list *list;
 
 	assert(counts.size > 0  && "Must initialize an_hook first");
-	list = calloc(1, sizeof(*list->data) + counts.size * sizeof(list->data[0]));
+	list = calloc(1, sizeof(*list) + counts.size * sizeof(list->data[0]));
 	assert(list != NULL);
 	list->size = 0;
 	list->capacity = counts.size;
@@ -316,8 +316,12 @@ amortize(const struct patch_list *records,
 
 		if ((first_page - 1) <= begin_page ||
 		    end_page <= (last_page + 1)) {
-			first_page = min(first_page, begin_page);
-			last_page = max(last_page, end_page);
+			if (begin_page < first_page) {
+				first_page = begin_page;
+			}
+			if (end_page > last_page) {
+				last_page = end_page;
+			}
 		} else {
 			PATCH();
 			section_begin = i;
