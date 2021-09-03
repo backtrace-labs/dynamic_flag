@@ -44,14 +44,6 @@ an_hook_init_lib(void)
 	return;
 }
 
-void
-an_hook_handler_http_enable(struct evhttp *httpd)
-{
-
-	(void)httpd;
-	return;
-}
-
 #else /* AN_HOOK_ENABLED */
 
 struct patch_record {
