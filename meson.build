@@ -23,3 +23,7 @@ anhook_lib = static_library('anhook', _anhook_src_files,
 
 libanhook_dep = declare_dependency(link_whole: anhook_lib,
 	include_directories: anhook_include_dir)
+
+executable('anhook_test_feature_flags', 'tests/feature_flags.c',
+	dependencies: [libanhook_dep],
+	link_language: 'c', install: false)
