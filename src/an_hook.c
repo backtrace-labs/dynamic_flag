@@ -19,7 +19,6 @@
 #endif
 
 #include <assert.h>
-#include <ck_spinlock.h>
 #include <dlfcn.h>
 #include <inttypes.h>
 #include <limits.h>
@@ -31,6 +30,8 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#include <pthread.h>
 
 #include "an_hook.h"
 
@@ -68,12 +69,13 @@ struct patch_list {
 	const struct patch_record *data[];
 };
 
-static ck_spinlock_t patch_lock = CK_SPINLOCK_INITIALIZER;
+static pthread_mutex_t patch_lock = PTHREAD_MUTEX_INITIALIZER;
+
 /* Hook records are in an array. For each hook record, count # of activations and disable calls. */
 static struct {
 	struct patch_count *data;
 	size_t size;
-}counts = { NULL };
+} counts = { NULL };
 
 extern const struct patch_record __start_an_hook_list[], __stop_an_hook_list[];
 
@@ -116,8 +118,11 @@ patch_list_push(struct patch_list *list, const struct patch_record *record)
 static void
 lock(void)
 {
+	int mutex_ret;
 
-	ck_spinlock_lock(&patch_lock);
+	mutex_ret = pthread_mutex_lock(&patch_lock);
+	assert(mutex_ret == 0);
+
 	if (__builtin_expect((counts.data == NULL), 0)) {
 		size_t n = __stop_an_hook_list - __start_an_hook_list;
 
@@ -133,8 +138,11 @@ lock(void)
 static void
 unlock(void)
 {
+	int mutex_ret;
 
-	ck_spinlock_unlock(&patch_lock);
+	mutex_ret = pthread_mutex_unlock(&patch_lock);
+	assert(mutex_ret == 0);
+
 	return;
 }
 

@@ -18,7 +18,7 @@ an_hook_c_args = [
 
 an_hook_lib = static_library('an_hook', _an_hook_src_files,
 	include_directories: an_hook_include_dir,
-	dependencies: [libck_dep, ],
+	dependencies: [],
 	c_args: an_hook_c_args)
 
 liban_hook_dep = declare_dependency(link_whole: an_hook_lib,
