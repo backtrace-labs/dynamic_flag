@@ -636,122 +636,12 @@ out:
 	return r;
 }
 
-static void
-print_record_names(struct evbuffer *buffer, an_array_t *records)
-{
-	void **cursor;
-
-	an_array_sort(records, cmp_patches_alpha);
-	evbuffer_add_printf(buffer, "    %-100s\tactivations\tunhooks\tsymbol\n", "name");
-
-	AN_ARRAY_FOREACH(records, cursor) {
-		Dl_info info;
-		const struct patch_record *record = *cursor;
-		size_t idx = record - __start_an_hook_list;
-		size_t n = an_array_length_activation(&counts);
-
-		assert(idx < n && "Hook out of bounds?!");
-		if (dladdr(record->hook, &info) != 0) {
-			evbuffer_add_printf(buffer, "    %-100s\t%11"PRIu64"\t%7"PRIu64"\t%s+%lx\n",
-			    record->name, AN_ARRAY_VALUE(activation, &counts, idx)->activation,
-			    AN_ARRAY_VALUE(activation, &counts, idx)->unhook,
-			    info.dli_sname, (char *)record->hook - (char *)info.dli_saddr);
-		} else {
-			evbuffer_add_printf(buffer, "    %-100s\t%11"PRIu64"\t%7"PRIu64"\tunknown_symbol\n",
-			    record->name, AN_ARRAY_VALUE(activation, &counts, idx)->activation,
-			    AN_ARRAY_VALUE(activation, &counts, idx)->unhook);
-		}
-	}
-
-	return;
-}
-
-static void
-hook_handler(struct evhttp_request *request, void *c)
-{
-	an_array_t acc;
-	struct evkeyvalq kv;
-	struct evbuffer *buffer;
-	const char *pattern, *uri;
-	int r;
-
-	if (request == NULL) {
-		return;
-	}
-
-	buffer = request->output_buffer;
-	uri = evhttp_request_uri(request);
-	evhttp_parse_query(uri, &kv);
-	pattern = evhttp_find_header(&kv, "pattern");
-	if (pattern == NULL) {
-		if (c == NULL) {
-			pattern = "";
-		} else {
-			EVBUFFER_ADD_STRING(buffer, "no pattern parameter found.\n");
-			goto out;
-		}
-	}
-
-	r = find_records(pattern, &acc);
-	if (r != 0) {
-		evbuffer_add_printf(buffer, "Pattern compilation failure for \"%s\".\n", pattern);
-		goto out;
-	}
-
-	if (c == NULL) {
-		evbuffer_add_printf(buffer,
-		    "Found %u patch points for pattern \"%s\".\n", an_array_length(&acc), pattern);
-	} else {
-		evbuffer_add_printf(buffer,
-		    "Found %u patch points for pattern \"%s\"... ", an_array_length(&acc), pattern);
-
-		if (c == activate_all) {
-			evbuffer_add_printf(buffer, "activated %zd point(s).\n",
-			    activate_all(&acc));
-		} else if (c == deactivate_all) {
-			evbuffer_add_printf(buffer, "deactivated %zd point(s).\n",
-			    deactivate_all(&acc));
-		} else if (c == unhook_all) {
-			evbuffer_add_printf(buffer, "unhooked %zd point(s).\n",
-			    unhook_all(&acc));
-		} else if (c == rehook_all) {
-			evbuffer_add_printf(buffer, "rehooked %zd point(s).\n",
-			    rehook_all(&acc));
-		} else {
-			assert(0 && "Unexpected handler argument");
-		}
-	}
-
-	print_record_names(buffer, &acc);
-	an_array_deinit(&acc);
-out:
-	evhttp_clear_headers(&kv);
-	evhttp_send_reply(request, HTTP_OK, "OK", NULL);
-	return;
-}
-
 void
 an_hook_init_lib()
 {
 
 	lock();
 	unlock();
-	return;
-}
-
-void
-an_hook_handler_http_enable(struct evhttp *httpd)
-{
-
-	an_handler_control_register("hook/activate", hook_handler, activate_all,
-	    "Conditionally enable a block of code with a named hook");
-	an_handler_control_register("hook/deactivate", hook_handler, deactivate_all,
-	    "Conditionally disable a block of code with a named hook");
-	an_handler_control_register("hook/unhook", hook_handler, unhook_all,
-	    "Conditionally remove a hook from activation");
-	an_handler_control_register("hook/rehook", hook_handler, rehook_all,
-	    "Conditionally reallow a hook to be activated");
-	an_handler_control_register("hook/list", hook_handler, NULL, NULL);
 	return;
 }
 

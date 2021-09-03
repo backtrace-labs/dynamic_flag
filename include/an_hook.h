@@ -287,8 +287,6 @@ int an_hook_rehook(const char *regex);
 # define AN_HOOK_DEBUG(NAME) AN_HOOK_UNSAFE(debug, NAME)
 #endif
 
-void an_hook_handler_http_enable(struct evhttp *httpd);
-
 void an_hook_init_lib();
 
 void an_hook_utrace_entry(const char *name, ...);
