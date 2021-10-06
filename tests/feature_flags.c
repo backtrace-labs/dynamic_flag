@@ -35,6 +35,16 @@ run_all(void)
 		printf("untouched:printf2\n");
 	}
 
+	AN_HOOK_FLIP(feature_flag, default_on) {
+	} else {
+		printf("feature_flag:default_on\n");
+	}
+
+	AN_HOOK_FLIP_OFF(feature_flag, default_off) {
+	} else {
+		printf("feature_flag:default_off\n");
+	}
+
 	return;
 }
 
@@ -42,7 +52,7 @@ static void
 wrapped_activate(const char *pat)
 {
 
-	printf("Activating %s\n", pat);
+	printf("\nActivating %s\n", pat);
 	an_hook_activate(pat);
 	return;
 }
@@ -51,9 +61,9 @@ static void
 wrapped_deactivate(const char *pat)
 {
 
-		printf("Deactivating %s\n", pat);
-		an_hook_deactivate(pat);
-		return;
+	printf("\nDeactivating %s\n", pat);
+	an_hook_deactivate(pat);
+	return;
 }
 
 int main(int argc, char **argv)
@@ -63,7 +73,7 @@ int main(int argc, char **argv)
 	run_all();
 	an_hook_init_lib();
 
-	printf("Initial:\n");
+	printf("\nInitial:\n");
 	run_all();
 
 	wrapped_activate("off:printf1");
@@ -73,6 +83,12 @@ int main(int argc, char **argv)
 	run_all();
 
 	wrapped_activate("on:printf3");
+	run_all();
+
+	wrapped_deactivate("feature_flag:.*");
+	run_all();
+
+	wrapped_activate("feature_flag:default_off");
 	run_all();
 
 	return 0;

@@ -214,6 +214,16 @@ an_hook_rehook(const char *regex)
     1, KIND, NAME, __FILE__, __LINE__, __COUNTER__)
 
 /**
+ * Hook that should be skipped to activate the corresponding code
+ * sequence, and defaults to executing the hooked code.  Useful for
+ * feature flags where the hooked code skips the feature.
+ *
+ * Defaults to executing the hook (i.e., deactivating the feature).
+ */
+#define AN_HOOK_FLIP_OFF(KIND, NAME) AN_HOOK_IMPL(AN_HOOK_VALUE_ACTIVE, AN_HOOK_VALUE_ACTIVE, \
+    1, KIND, NAME, __FILE__, __LINE__, __COUNTER__)
+
+/**
  * Ensure a hook point exists for kind KIND.
  */
 #define AN_HOOK_DUMMY(KIND)						\
