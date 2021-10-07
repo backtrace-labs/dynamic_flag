@@ -15,6 +15,7 @@
 #define AN_HOOK_ON(KIND, NAME) if (1)
 #define AN_HOOK_UNSAFE(KIND, NAME) if (0)
 #define AN_HOOK_FLIP(KIND, NAME) if (0)
+#define AN_HOOK_FLIP_OFF(KIND, NAME) if (1)
 #define AN_HOOK_DUMMY(KIND) do { } while (0)
 
 static inline int
