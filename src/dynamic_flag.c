@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-#include "an_hook.h"
+#include "dynamic_flag.h"
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -185,7 +185,6 @@ unpatch(const struct patch_record *record)
 	*address = 0xa9; /* testl $..., %eax */
 	return;
 }
-
 #elif DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 1
 #define HOOK_SIZE 3 /* REX byte + mov imm8 */
 

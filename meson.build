@@ -3,7 +3,7 @@ an_hook_src_dir = 'src'
 an_hook_include_dir = include_directories('include')
 
 an_hook_src_files = '''
-	an_hook.c
+	dynamic_flag.c
 '''.split()
 
 _an_hook_src_files = []
