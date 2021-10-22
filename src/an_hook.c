@@ -190,15 +190,22 @@ static void
 patch(const struct patch_record *record)
 {
 	uint8_t *address = record->hook;
+	/* +1 to get the immediate field after the MOV opcode. */
 	uint8_t *field = address + 1;
 
-	/* F4 is HLT, 0x0 is ADD [AL], AL */
-	if (field[0] != AN_HOOK_VALUE_ACTIVE && field[0] != AN_HOOK_VALUE_INACTIVE) {
+	/*
+	 * F4 is HLT, 0x0 is ADD [AL], AL.  Neither is a MOV opcode.
+	 * Any mismatch must mean we have a 3-byte REX MOV, and we
+	 * have to go forward one more byte.
+	 */
+	if (field[0] != DYNAMIC_FLAG_VALUE_ACTIVE &&
+	    field[0] != DYNAMIC_FLAG_VALUE_INACTIVE) {
 		field++;
 	}
 
-	assert((field[0] == AN_HOOK_VALUE_ACTIVE) || (field[0] == AN_HOOK_VALUE_INACTIVE));
-	field[0] = AN_HOOK_VALUE_ACTIVE;
+	assert((field[0] == DYNAMIC_FLAG_VALUE_ACTIVE) ||
+	    (field[0] == DYNAMIC_FLAG_VALUE_INACTIVE));
+	field[0] = DYNAMIC_FLAG_VALUE_ACTIVE;
 	return;
 }
 
@@ -208,12 +215,14 @@ unpatch(const struct patch_record *record)
 	uint8_t *address = record->hook;
 	uint8_t *field = address + 1;
 
-	if (field[0] != AN_HOOK_VALUE_ACTIVE && field[0] != AN_HOOK_VALUE_INACTIVE) {
+	if (field[0] != DYNAMIC_FLAG_VALUE_ACTIVE &&
+	    field[0] != DYNAMIC_FLAG_VALUE_INACTIVE) {
 		field++;
 	}
 
-	assert((field[0] == AN_HOOK_VALUE_ACTIVE) || (field[0] == AN_HOOK_VALUE_INACTIVE));
-	field[0] = AN_HOOK_VALUE_INACTIVE;
+	assert((field[0] == DYNAMIC_FLAG_VALUE_ACTIVE) ||
+	    (field[0] == DYNAMIC_FLAG_VALUE_INACTIVE));
+	field[0] = DYNAMIC_FLAG_VALUE_INACTIVE;
 	return;
 }
 #endif
@@ -228,17 +237,17 @@ default_patch(const struct patch_record *record)
 	assert(i < counts.size && "Hook out of bounds?!");
 
 	switch (record->initial_opcode) {
-	case AN_HOOK_VALUE_ACTIVE:
+	case DYNAMIC_FLAG_VALUE_ACTIVE:
 		counts.data[i].activation = (record->flipped != 0) ? 0 : 1;
 		patch(record);
 		break;
-	case AN_HOOK_VALUE_INACTIVE:
+	case DYNAMIC_FLAG_VALUE_INACTIVE:
 		counts.data[i].activation = (record->flipped != 0) ? 1 : 0;
 		unpatch(record);
 		break;
 	default:
-		assert((record->initial_opcode == AN_HOOK_VALUE_ACTIVE ||
-		    record->initial_opcode == AN_HOOK_VALUE_INACTIVE) &&
+		assert((record->initial_opcode == DYNAMIC_FLAG_VALUE_ACTIVE ||
+		    record->initial_opcode == DYNAMIC_FLAG_VALUE_INACTIVE) &&
 		    "Initial opcode/value must be ACTIVE or INACTIVE (JMP REL32 or TEST / 0xF4 or 0)");
 	}
 

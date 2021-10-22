@@ -73,8 +73,8 @@
 #endif
 
 #if !AN_HOOK_FALLBACK
-#define AN_HOOK_VALUE_ACTIVE 0xe9 /* jmp rel 32 */
-#define AN_HOOK_VALUE_INACTIVE 0xa9 /* testl $, %eax */
+#define DYNAMIC_FLAG_VALUE_ACTIVE 0xe9 /* jmp rel 32 */
+#define DYNAMIC_FLAG_VALUE_INACTIVE 0xa9 /* testl $, %eax */
 
 #define AN_HOOK_IMPL_(OPCODE, INITIAL, FLIPPED, KIND, NAME, FILE, LINE, GENSYM)	\
 	if (__builtin_expect(({						\
@@ -107,8 +107,8 @@
  * 0xF4 is HLT, a privileged instruction that shuts down the core.
  * GCC shouldn't ever generate that.
  */
-#define AN_HOOK_VALUE_ACTIVE 0xF4
-#define AN_HOOK_VALUE_INACTIVE 0
+#define DYNAMIC_FLAG_VALUE_ACTIVE 0xF4
+#define DYNAMIC_FLAG_VALUE_INACTIVE 0
 
 #define AN_HOOK_IMPL_(DEFAULT, INITIAL, FLIPPED, KIND, NAME, FILE, LINE, GENSYM) \
 	if (__builtin_expect(({						\
@@ -144,19 +144,19 @@
  * Defaults to inactive, unless the an_hook machinery can't get to it,
  * then it's always active.
  */
-#define AN_HOOK(KIND, NAME) AN_HOOK_IMPL(AN_HOOK_VALUE_ACTIVE, AN_HOOK_VALUE_INACTIVE, \
+#define AN_HOOK(KIND, NAME) AN_HOOK_IMPL(DYNAMIC_FLAG_VALUE_ACTIVE, DYNAMIC_FLAG_VALUE_INACTIVE, \
     0, KIND, NAME, __FILE__, __LINE__, __COUNTER__)
 
 /**
  * Same as AN_HOOK, but defaults to active.
  */
-#define AN_HOOK_ON(KIND, NAME) AN_HOOK_IMPL(AN_HOOK_VALUE_ACTIVE, AN_HOOK_VALUE_ACTIVE, \
+#define AN_HOOK_ON(KIND, NAME) AN_HOOK_IMPL(DYNAMIC_FLAG_VALUE_ACTIVE, DYNAMIC_FLAG_VALUE_ACTIVE, \
     0, KIND, NAME, __FILE__, __LINE__, __COUNTER__)
 
 /**
  * Defaults to inactive, even if unreachable by the an_hook machinery.
  */
-#define AN_HOOK_UNSAFE(KIND, NAME) AN_HOOK_IMPL(AN_HOOK_VALUE_INACTIVE, AN_HOOK_VALUE_INACTIVE, \
+#define AN_HOOK_UNSAFE(KIND, NAME) AN_HOOK_IMPL(DYNAMIC_FLAG_VALUE_INACTIVE, DYNAMIC_FLAG_VALUE_INACTIVE, \
     0, KIND, NAME, __FILE__, __LINE__, __COUNTER__)
 
 /**
@@ -165,7 +165,7 @@
  *
  * Defaults to skipped hook.
  */
-#define AN_HOOK_FLIP(KIND, NAME) AN_HOOK_IMPL(AN_HOOK_VALUE_INACTIVE, AN_HOOK_VALUE_INACTIVE, \
+#define AN_HOOK_FLIP(KIND, NAME) AN_HOOK_IMPL(DYNAMIC_FLAG_VALUE_INACTIVE, DYNAMIC_FLAG_VALUE_INACTIVE, \
     1, KIND, NAME, __FILE__, __LINE__, __COUNTER__)
 
 /**
@@ -175,7 +175,7 @@
  *
  * Defaults to executing the hook (i.e., deactivating the feature).
  */
-#define AN_HOOK_FLIP_OFF(KIND, NAME) AN_HOOK_IMPL(AN_HOOK_VALUE_ACTIVE, AN_HOOK_VALUE_ACTIVE, \
+#define AN_HOOK_FLIP_OFF(KIND, NAME) AN_HOOK_IMPL(DYNAMIC_FLAG_VALUE_ACTIVE, DYNAMIC_FLAG_VALUE_ACTIVE, \
     1, KIND, NAME, __FILE__, __LINE__, __COUNTER__)
 
 /**
