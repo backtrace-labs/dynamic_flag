@@ -69,6 +69,9 @@ wrapped_deactivate(const char *pat)
 int main(int argc, char **argv)
 {
 
+	(void)argc;
+	(void)argv;
+
 	printf("Before init\n");
 	run_all();
 	an_hook_init_lib();
@@ -89,6 +92,32 @@ int main(int argc, char **argv)
 	run_all();
 
 	wrapped_activate("feature_flag:default_off");
+	run_all();
+
+	printf("\nActivating feature_flag\n");
+	an_hook_activate_kind(feature_flag, ".*");
+	run_all();
+
+	printf("\nDeactivating feature_flag\n");
+	an_hook_deactivate_kind(feature_flag, ".*");
+	run_all();
+
+	printf("\nUnhooking feature_flag:.*");
+	an_hook_unhook("feature_flag:.*");
+	wrapped_activate("feature_flag:.*");
+	run_all();
+
+	printf("\nDeactivating feature_flag:.*\n");
+	an_hook_deactivate_kind(feature_flag, ".*");
+	run_all();
+
+	printf("\nRehooking feature_flag:.*");
+	an_hook_rehook("feature_flag:.*");
+	wrapped_activate("feature_flag:.*");
+	run_all();
+
+	printf("\nDeactivating feature_flag\n");
+	an_hook_deactivate_kind(feature_flag, ".*");
 	run_all();
 
 	return 0;
