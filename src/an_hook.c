@@ -1,4 +1,5 @@
 /*
+ * Copyright 2021 Backtrace I/O, Inc.
  * Copyright 2018 AppNexus, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,10 +15,11 @@
  * limitations under the License.
  */
 
+#include "an_hook.h"
+
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
-#include "an_hook.h"
 
 #include <assert.h>
 #include <dlfcn.h>
@@ -38,7 +40,6 @@ extern int dynamic_flag_dummy(const char *regex);
 extern void dynamic_flag_init_lib_dummy(void);
 
 #if DYNAMIC_FLAG_IMPLEMENTATION_STYLE > 0
-
 struct patch_record {
 	void *hook;
 	void *destination;
@@ -145,7 +146,7 @@ __attribute__((__used__)) static void
 dummy(void)
 {
 
-	AN_HOOK_DUMMY(none);
+	DYNAMIC_FLAG_DUMMY(none);
 }
 
 #if DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 2
@@ -185,7 +186,7 @@ unpatch(const struct patch_record *record)
 	return;
 }
 
-#else
+#elif DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 1
 #define HOOK_SIZE 3 /* REX byte + mov imm8 */
 
 static void
@@ -634,5 +635,4 @@ dynamic_flag_init_lib(void)
 	unlock();
 	return;
 }
-
-#endif  /* DYNAMIC_FLAG_IMPLEMENTATION_STYLE > 0 */
+#endif /* DYNAMIC_FLAG_IMPLEMENTATION_STYLE > 0 */
