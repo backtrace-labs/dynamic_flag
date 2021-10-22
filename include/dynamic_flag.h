@@ -32,14 +32,17 @@
 	"or 2 (preferred asm-goto implementation)."
 #endif
 
-#if DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 0
 /**
  * DF_FEATURE defines a dynamic boolean flag that defaults to false,
  * and is always false when the dynamic_flag library does not run.
  *
  * It is useful for experimental feature flags.
  */
-#define DF_FEATURE(KIND, NAME) 0
+#define DF_FEATURE(KIND, NAME)						\
+	__builtin_expect(DYNAMIC_FLAG_IMPL(				\
+	    DYNAMIC_FLAG_VALUE_INACTIVE, DYNAMIC_FLAG_VALUE_INACTIVE, 0, \
+	    KIND, NAME, __FILE__, __LINE__),				\
+        0)
 
 /**
  * DF_DEFAULT defines a dynamic boolean flag that defaults to true,
@@ -47,145 +50,31 @@
  *
  * It is useful for code that is usually enabled.
  */
-#define DF_DEFAULT(KIND, NAME) 1
+#define DF_DEFAULT(KIND, NAME)						\
+	__builtin_expect(!DYNAMIC_FLAG_IMPL(				\
+	    DYNAMIC_FLAG_VALUE_INACTIVE, DYNAMIC_FLAG_VALUE_INACTIVE, 1, \
+	    KIND, NAME, __FILE__, __LINE__),				\
+	1)
 
 /**
  * DF_OPT (optional or opt-in) defines a dynamic boolean flag that
- * defaults to false, and is always true when the dynamic_flag library
+ * defaults to false, but is always true when the dynamic_flag library
  * does not run.
  *
  * It is useful for code that is usually disabled, but should always
  * be safe to enable.
  */
-#define DF_OPT(KIND, NAME) 1
-
-#elif DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 1
-
-/*
- * Fallback implementation: mov a constant into a variable, and let
- * the compiler test on that.
- *
- * 0xF4 is HLT, a privileged instruction that shuts down the core; it
- * should be rare in machine code, so we'll be able to figure out if
- * the patch location is wrong.
- *
- * DEFAULT is the flag value in the machine code, before the dynamic
- * flag machinery is activated.
- *
- * INITIAL is the flag value set by the dynamic flag machinery on
- * startup.
- *
- * FLIPPED means that activating the flag should write
- * `DYNAMIC_FLAG_VALUE_INACTIVE`.
- */
-#define DYNAMIC_FLAG_VALUE_ACTIVE 0xF4
-#define DYNAMIC_FLAG_VALUE_INACTIVE 0
-
-#define DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED,			\
-    KIND, NAME, FILE, LINE, GENSYM)					\
-	({								\
-	    unsigned char r;						\
-									\
-	    asm ("1:\n\t"						\
-		 "movb $"#DEFAULT", %0\n\t"				\
-									\
-		 ".pushsection .rodata\n\t"				\
-		 "2: .asciz \"" #KIND ":" #NAME "@" FILE ":" #LINE "\"\n\t" \
-		 ".popsection\n\t"					\
-									\
-		 ".pushsection dynamic_flag_list,\"a\",@progbits\n\t"	\
-		 "3:\n\t"						\
-		 ".quad 1b\n\t"						\
-		 ".quad 0\n\t"						\
-		 ".quad 2b\n\t"						\
-		 ".byte "#INITIAL"\n\t"					\
-		 ".byte "#FLIPPED"\n\t"					\
-		 ".fill 6\n\t"						\
-		 ".popsection\n\t"					\
-									\
-		 ".pushsection dynamic_flag_"#KIND"_list,\"a\",@progbits\n\t"\
-		 ".quad 3b\n\t"						\
-		 ".popsection"						\
-		:"=r"(r));						\
-	    !!r;							\
-	})
-
-#elif DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 2
-
-/*
- * Preferred implementation. We use an asm goto to execute a `testl
- * $..., %eax` and fall through to the "inactive" code block by
- * default, and overwrite the opcode to a `jmp rel` to activate the
- * code block.
- *
- * Using `testl` as our quasi-noop makes it possible to encode the
- * jump offset statically.
- */
-
-#define DYNAMIC_FLAG_VALUE_ACTIVE 0xe9 /* jmp rel 32 */
-#define DYNAMIC_FLAG_VALUE_INACTIVE 0xa9 /* testl $, %eax */
-
-#define DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED,			\
-    KIND, NAME, FILE, LINE, GENSYM)					\
-	({								\
-	    unsigned char r = 0;					\
-									\
-	    asm goto ("1:\n\t"						\
-		      ".byte "#DEFAULT"\n\t"				\
-		      ".long %l[dynamic_flag_"#GENSYM"_label] - (1b + 5)\n\t"\
-									\
-		      ".pushsection .rodata\n\t"			\
-		      "2: .asciz \"" #KIND ":" #NAME "@" FILE ":" #LINE "\"\n\t" \
-		      ".popsection\n\t"					\
-									\
-		      ".pushsection dynamic_flag_list,\"a\",@progbits\n\t"\
-		      "3:\n\t"						\
-		      ".quad 1b\n\t"					\
-		      ".quad %l[dynamic_flag_"#GENSYM"_label]\n\t" 	\
-		      ".quad 2b\n\t"					\
-		      ".byte "#INITIAL"\n\t"				\
-		      ".byte "#FLIPPED"\n\t"				\
-		      ".fill 6\n\t"					\
-		      ".popsection\n\t"					\
-									\
-		      ".pushsection dynamic_flag_"#KIND"_list,\"a\",@progbits\n\t" \
-		      ".quad 3b\n\t"					\
-		      ".popsection"					\
-		      ::: "cc" : dynamic_flag_##GENSYM##_label);	\
-	    if (0) {							\
-	    dynamic_flag_##GENSYM##_label: __attribute__((__cold__));	\
-		    r = 1;						\
-	    }								\
-									\
-	    r;								\
-	})
-#endif
-
-#if DYNAMIC_FLAG_IMPLEMENTATION_STYLE != 0
-#define DYNAMIC_FLAG_IMPL(DEFAULT, INITIAL, FLIPPED,			\
-			  KIND, NAME, FILE, LINE, GENSYM)		\
-	DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED,			\
-			   KIND, NAME, FILE, LINE, GENSYM)
-
-#define DF_FEATURE(KIND, NAME)						\
-	__builtin_expect(DYNAMIC_FLAG_IMPL(				\
-	    DYNAMIC_FLAG_VALUE_INACTIVE, DYNAMIC_FLAG_VALUE_INACTIVE, 0, \
-	    KIND, NAME, __FILE__, __LINE__, __COUNTER__),		\
-        0)
-
-#define DF_DEFAULT(KIND, NAME)						\
-	__builtin_expect(!DYNAMIC_FLAG_IMPL(				\
-	    DYNAMIC_FLAG_VALUE_INACTIVE, DYNAMIC_FLAG_VALUE_INACTIVE, 1, \
-	    KIND, NAME, __FILE__, __LINE__, __COUNTER__),		\
-	1)
-
 #define DF_OPT(KIND, NAME)						\
 	__builtin_expect(DYNAMIC_FLAG_IMPL(				\
 	    DYNAMIC_FLAG_VALUE_ACTIVE, DYNAMIC_FLAG_VALUE_INACTIVE, 0,	\
-	    KIND, NAME, __FILE__, __LINE__, __COUNTER__),		\
+	    KIND, NAME, __FILE__, __LINE__),				\
 	0)
-#endif
 
+/**
+ * Defines a flag for a given KIND: dynamic_flag_activate_kind and
+ * dynamic_flag_deactivate_kind will fail to link if there are no
+ * flag for that kind.
+ */
 #define DYNAMIC_FLAG_DUMMY(KIND)					\
 	do {								\
 		if (DF_FEATURE(KIND, dummy)) {				\
@@ -193,6 +82,10 @@
 		}							\
 	} while (0)
 
+/**
+ * DF_DEBUG flags are enabled by default in regular builds, and
+ * disabled by default in NDEBUG (release) builds.
+ */
 #ifdef NDEBUG
 # define DF_DEBUG(NAME) DF_DEFAULT(debug, NAME)
 #else
@@ -264,15 +157,135 @@ int dynamic_flag_rehook(const char *regex);
  */
 void dynamic_flag_init_lib(void);
 #else
+#define dynamic_flag_activate_kind(KIND, PATTERN) dynamic_flag_dummy((PATTERN))
+#define dynamic_flag_deactivate_kind(KIND, PATTERN) dynamic_flag_dummy((PATTERN))
+
 #define dynamic_flag_activate dynamic_flag_dummy
 #define dynamic_flag_deactivate dynamic_flag_dummy
 #define dynamic_flag_unhook dynamic_flag_dummy
 #define dynamic_flag_rehook dynamic_flag_dummy
 #define dynamic_flag_init_lib dynamic_flag_init_lib_dummy
-
-#define dynamic_flag_activate_kind(KIND, PATTERN) dynamic_flag_dummy((PATTERN))
-#define dynamic_flag_deactivate_kind(KIND, PATTERN) dynamic_flag_dummy((PATTERN))
 #endif
+
+#if DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 0
+
+#define DYNAMIC_FLAG_VALUE_ACTIVE 1
+#define DYNAMIC_FLAG_VALUE_INACTIVE 0
+#define DYNAMIC_FLAG_IMPL_(DEFAULT, ...) DEFAULT
+
+#elif DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 1
+
+/*
+ * Fallback implementation: mov a constant into a variable, and let
+ * the compiler test on that.
+ *
+ * 0xF4 is HLT, a privileged instruction that shuts down the core; it
+ * should be rare in machine code, so we'll be able to figure out if
+ * the patch location is wrong.
+ *
+ * DEFAULT is the flag value in the machine code, before the dynamic
+ * flag machinery is activated.
+ *
+ * INITIAL is the flag value set by the dynamic flag machinery on
+ * startup.
+ *
+ * FLIPPED means that activating the flag should write
+ * `DYNAMIC_FLAG_VALUE_INACTIVE`.
+ */
+#define DYNAMIC_FLAG_VALUE_ACTIVE 0xF4
+#define DYNAMIC_FLAG_VALUE_INACTIVE 0
+
+#define DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED,			\
+    KIND, NAME, FILE, LINE)						\
+	({								\
+	    unsigned char r;						\
+									\
+	    asm ("1:\n\t"						\
+		 "movb $"#DEFAULT", %0\n\t"				\
+									\
+		 ".pushsection .rodata\n\t"				\
+		 "2: .asciz \"" #KIND ":" #NAME "@" FILE ":" #LINE "\"\n\t" \
+		 ".popsection\n\t"					\
+									\
+		 ".pushsection dynamic_flag_list,\"a\",@progbits\n\t"	\
+		 "3:\n\t"						\
+		 ".quad 1b\n\t"						\
+		 ".quad 0\n\t"						\
+		 ".quad 2b\n\t"						\
+		 ".byte "#INITIAL"\n\t"					\
+		 ".byte "#FLIPPED"\n\t"					\
+		 ".fill 6\n\t"						\
+		 ".popsection\n\t"					\
+									\
+		 ".pushsection dynamic_flag_"#KIND"_list,\"a\",@progbits\n\t"\
+		 ".quad 3b\n\t"						\
+		 ".popsection"						\
+		:"=r"(r));						\
+	    !!r;							\
+	})
+
+#elif DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 2
+
+/*
+ * Preferred implementation. We use an asm goto to execute a `testl
+ * $..., %eax` and fall through to the "inactive" code block by
+ * default, and overwrite the opcode to a `jmp rel` to activate the
+ * code block.
+ *
+ * Using `testl` as our quasi-noop makes it possible to encode the
+ * jump offset statically.
+ */
+
+#define DYNAMIC_FLAG_VALUE_ACTIVE 0xe9 /* jmp rel 32 */
+#define DYNAMIC_FLAG_VALUE_INACTIVE 0xa9 /* testl $, %eax */
+
+#if defined(__GNUC__) && !defined(__clang__)
+#define DYNAMIC_FLAG_IMPL_COLD __attribute__((__cold__))
+#else
+#define DYNAMIC_FLAG_IMPL_COLD
+#endif
+
+#define DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED,			\
+    KIND, NAME, FILE, LINE)						\
+	({								\
+	    __label__ DYNAMIC_FLAG_IMPL_label;				\
+	    unsigned char r = 0;					\
+									\
+	    asm goto ("1:\n\t"						\
+		      ".byte "#DEFAULT"\n\t"				\
+		      ".long %l[DYNAMIC_FLAG_IMPL_label] - (1b + 5)\n\t"\
+									\
+		      ".pushsection .rodata\n\t"			\
+		      "2: .asciz \"" #KIND ":" #NAME "@" FILE ":" #LINE "\"\n\t" \
+		      ".popsection\n\t"					\
+									\
+		      ".pushsection dynamic_flag_list,\"a\",@progbits\n\t"\
+		      "3:\n\t"						\
+		      ".quad 1b\n\t"					\
+		      ".quad %l[DYNAMIC_FLAG_IMPL_label]\n\t" 	\
+		      ".quad 2b\n\t"					\
+		      ".byte "#INITIAL"\n\t"				\
+		      ".byte "#FLIPPED"\n\t"				\
+		      ".fill 6\n\t"					\
+		      ".popsection\n\t"					\
+									\
+		      ".pushsection dynamic_flag_"#KIND"_list,\"a\",@progbits\n\t" \
+		      ".quad 3b\n\t"					\
+		      ".popsection"					\
+		      ::: "cc" : DYNAMIC_FLAG_IMPL_label);		\
+	    if (0) {							\
+	    DYNAMIC_FLAG_IMPL_label: DYNAMIC_FLAG_IMPL_COLD;		\
+		    r = 1;						\
+	    }								\
+									\
+	    r;								\
+	})
+#endif
+
+#define DYNAMIC_FLAG_IMPL(DEFAULT, INITIAL, FLIPPED,			\
+			  KIND, NAME, FILE, LINE)			\
+	DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED,			\
+			   KIND, NAME, FILE, LINE)
 
 inline int
 dynamic_flag_dummy(const char *regex)
