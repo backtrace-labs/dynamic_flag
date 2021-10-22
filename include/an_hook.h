@@ -8,41 +8,7 @@
 # endif
 #endif
 
-inline int
-an_hook_dummy(const char *regex)
-{
-
-	(void)regex;
-	return 0;
-}
-
-inline void
-an_hook_init_lib_dummy(void)
-{
-
-	return;
-}
-
-#if !AN_HOOK_ENABLED
-
-#define AN_HOOK(KIND, NAME) if (1)
-#define AN_HOOK_ON(KIND, NAME) if (1)
-#define AN_HOOK_UNSAFE(KIND, NAME) if (0)
-#define AN_HOOK_FLIP(KIND, NAME) if (0)
-#define AN_HOOK_FLIP_OFF(KIND, NAME) if (1)
-#define AN_HOOK_DUMMY(KIND) do { } while (0)
-
-#define an_hook_activate an_hook_dummy
-#define an_hook_deactivate an_hook_dummy
-#define an_hook_unhook an_hook_dummy
-#define an_hook_rehook an_hook_dummy
-#define an_hook_init_lib an_hook_init_lib_dummy
-
-#define an_hook_activate_kind(KIND, PATTERN) an_hook_activate((PATTERN))
-#define an_hook_deactivate_kind(KIND, PATTERN) an_hook_deactivate((PATTERN))
-
-#else /* AN_HOOK_ENABLED */
-
+#if AN_HOOK_ENABLED
 /**
  * @brief Conditionally enable a block of code with a named hook.
  *
@@ -289,4 +255,37 @@ int an_hook_rehook(const char *regex);
  * It is safe if useless to call this function multiple times.
  */
 void an_hook_init_lib(void);
-#endif /* AN_HOOK_ENABLED */
+
+#else
+
+#define AN_HOOK(KIND, NAME) if (1)
+#define AN_HOOK_ON(KIND, NAME) if (1)
+#define AN_HOOK_UNSAFE(KIND, NAME) if (0)
+#define AN_HOOK_FLIP(KIND, NAME) if (0)
+#define AN_HOOK_FLIP_OFF(KIND, NAME) if (1)
+#define AN_HOOK_DUMMY(KIND) do { } while (0)
+
+#define an_hook_activate an_hook_dummy
+#define an_hook_deactivate an_hook_dummy
+#define an_hook_unhook an_hook_dummy
+#define an_hook_rehook an_hook_dummy
+#define an_hook_init_lib an_hook_init_lib_dummy
+
+#define an_hook_activate_kind(KIND, PATTERN) an_hook_activate((PATTERN))
+#define an_hook_deactivate_kind(KIND, PATTERN) an_hook_deactivate((PATTERN))
+#endif /* !AN_HOOK_ENABLED */
+
+inline int
+an_hook_dummy(const char *regex)
+{
+
+	(void)regex;
+	return 0;
+}
+
+inline void
+an_hook_init_lib_dummy(void)
+{
+
+	return;
+}
