@@ -59,55 +59,6 @@
  */
 #define DF_OPT(KIND, NAME) 1
 
-#elif DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 2
-
-/*
- * Preferred implementation. We use an asm goto to execute a `testl
- * $..., %eax` and fall through to the "inactive" code block by
- * default, and overwrite the opcode to a `jmp rel` to activate the
- * code block.
- *
- * Using `testl` as our quasi-noop makes it possible to encode the
- * jump offset statically.
- */
-
-#define DYNAMIC_FLAG_VALUE_ACTIVE 0xe9 /* jmp rel 32 */
-#define DYNAMIC_FLAG_VALUE_INACTIVE 0xa9 /* testl $, %eax */
-
-#define DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED,			\
-    KIND, NAME, FILE, LINE, GENSYM)					\
-	({								\
-	    unsigned char r = 0;					\
-									\
-	    asm goto ("1:\n\t"						\
-		      ".byte "#DEFAULT"\n\t"				\
-		      ".long %l[dynamic_flag_"#GENSYM"_label] - (1b + 5)\n\t"\
-									\
-		      ".pushsection .rodata\n\t"			\
-		      "2: .asciz \"" #KIND ":" #NAME "@" FILE ":" #LINE "\"\n\t" \
-		      ".popsection\n\t"					\
-									\
-		      ".pushsection dynamic_flag_list,\"a\",@progbits\n\t"\
-		      "3:\n\t"						\
-		      ".quad 1b\n\t"					\
-		      ".quad %l[dynamic_flag_"#GENSYM"_label]\n\t" 	\
-		      ".quad 2b\n\t"					\
-		      ".byte "#INITIAL"\n\t"				\
-		      ".byte "#FLIPPED"\n\t"				\
-		      ".fill 6\n\t"					\
-		      ".popsection\n\t"					\
-									\
-		      ".pushsection dynamic_flag_"#KIND"_list,\"a\",@progbits\n\t" \
-		      ".quad 3b\n\t"					\
-		      ".popsection"					\
-		      ::: "cc" : dynamic_flag_##GENSYM##_label);	\
-	    if (0) {							\
-	    dynamic_flag_##GENSYM##_label: __attribute__((__cold__));	\
-		    r = 1;						\
-	    }								\
-									\
-	    r;								\
-	})
 #elif DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 1
 
 /*
@@ -159,6 +110,55 @@
 	    !!r;							\
 	})
 
+#elif DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 2
+
+/*
+ * Preferred implementation. We use an asm goto to execute a `testl
+ * $..., %eax` and fall through to the "inactive" code block by
+ * default, and overwrite the opcode to a `jmp rel` to activate the
+ * code block.
+ *
+ * Using `testl` as our quasi-noop makes it possible to encode the
+ * jump offset statically.
+ */
+
+#define DYNAMIC_FLAG_VALUE_ACTIVE 0xe9 /* jmp rel 32 */
+#define DYNAMIC_FLAG_VALUE_INACTIVE 0xa9 /* testl $, %eax */
+
+#define DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED,			\
+    KIND, NAME, FILE, LINE, GENSYM)					\
+	({								\
+	    unsigned char r = 0;					\
+									\
+	    asm goto ("1:\n\t"						\
+		      ".byte "#DEFAULT"\n\t"				\
+		      ".long %l[dynamic_flag_"#GENSYM"_label] - (1b + 5)\n\t"\
+									\
+		      ".pushsection .rodata\n\t"			\
+		      "2: .asciz \"" #KIND ":" #NAME "@" FILE ":" #LINE "\"\n\t" \
+		      ".popsection\n\t"					\
+									\
+		      ".pushsection dynamic_flag_list,\"a\",@progbits\n\t"\
+		      "3:\n\t"						\
+		      ".quad 1b\n\t"					\
+		      ".quad %l[dynamic_flag_"#GENSYM"_label]\n\t" 	\
+		      ".quad 2b\n\t"					\
+		      ".byte "#INITIAL"\n\t"				\
+		      ".byte "#FLIPPED"\n\t"				\
+		      ".fill 6\n\t"					\
+		      ".popsection\n\t"					\
+									\
+		      ".pushsection dynamic_flag_"#KIND"_list,\"a\",@progbits\n\t" \
+		      ".quad 3b\n\t"					\
+		      ".popsection"					\
+		      ::: "cc" : dynamic_flag_##GENSYM##_label);	\
+	    if (0) {							\
+	    dynamic_flag_##GENSYM##_label: __attribute__((__cold__));	\
+		    r = 1;						\
+	    }								\
+									\
+	    r;								\
+	})
 #endif
 
 #if DYNAMIC_FLAG_IMPLEMENTATION_STYLE != 0

@@ -149,43 +149,7 @@ dummy(void)
 	DYNAMIC_FLAG_DUMMY(none);
 }
 
-#if DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 2
-#define HOOK_SIZE 5
-
-static void
-patch(const struct patch_record *record)
-{
-	uint8_t *address = record->hook;
-	void *dst = record->destination;
-	int32_t *target = (int32_t *)(address + 1);
-	intptr_t offset = (uint8_t *)dst - (address + 5); /* IP offset from end of instruction. */
-
-	assert((*address == 0xe9 || *address == 0xa9) &&
-	    "Target should be a jmp rel or a testl $..., %eax");
-	assert((offset == (intptr_t)*target) &&
-	    "Target's offset should match with the hook destination.");
-
-	*address = 0xe9; /* jmp rel */
-	return;
-}
-
-static void
-unpatch(const struct patch_record *record)
-{
-	uint8_t *address = record->hook;
-	void *dst = record->destination;
-	int32_t *target = (int32_t *)(address + 1);
-	intptr_t offset = (uint8_t *)dst - (address + 5);
-
-	assert((*address == 0xe9 || *address == 0xa9) &&
-	    "Target should be a jmp rel or a testl $..., %eax");
-	assert((offset == (intptr_t)*target) &&
-	    "Target's offset should match with the hook destination.");
-
-	*address = 0xa9; /* testl $..., %eax */
-	return;
-}
-#elif DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 1
+#if DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 1
 #define HOOK_SIZE 3 /* REX byte + mov imm8 */
 
 static void
@@ -225,6 +189,42 @@ unpatch(const struct patch_record *record)
 	assert((field[0] == DYNAMIC_FLAG_VALUE_ACTIVE) ||
 	    (field[0] == DYNAMIC_FLAG_VALUE_INACTIVE));
 	field[0] = DYNAMIC_FLAG_VALUE_INACTIVE;
+	return;
+}
+#elif DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 2
+#define HOOK_SIZE 5
+
+static void
+patch(const struct patch_record *record)
+{
+	uint8_t *address = record->hook;
+	void *dst = record->destination;
+	int32_t *target = (int32_t *)(address + 1);
+	intptr_t offset = (uint8_t *)dst - (address + 5); /* IP offset from end of instruction. */
+
+	assert((*address == 0xe9 || *address == 0xa9) &&
+	    "Target should be a jmp rel or a testl $..., %eax");
+	assert((offset == (intptr_t)*target) &&
+	    "Target's offset should match with the hook destination.");
+
+	*address = 0xe9; /* jmp rel */
+	return;
+}
+
+static void
+unpatch(const struct patch_record *record)
+{
+	uint8_t *address = record->hook;
+	void *dst = record->destination;
+	int32_t *target = (int32_t *)(address + 1);
+	intptr_t offset = (uint8_t *)dst - (address + 5);
+
+	assert((*address == 0xe9 || *address == 0xa9) &&
+	    "Target should be a jmp rel or a testl $..., %eax");
+	assert((offset == (intptr_t)*target) &&
+	    "Target's offset should match with the hook destination.");
+
+	*address = 0xa9; /* testl $..., %eax */
 	return;
 }
 #endif
