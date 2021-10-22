@@ -157,6 +157,7 @@ int dynamic_flag_rehook(const char *regex);
  */
 void dynamic_flag_init_lib(void);
 #else
+
 #define dynamic_flag_activate_kind(KIND, PATTERN) dynamic_flag_dummy((PATTERN))
 #define dynamic_flag_deactivate_kind(KIND, PATTERN) dynamic_flag_dummy((PATTERN))
 
@@ -165,6 +166,7 @@ void dynamic_flag_init_lib(void);
 #define dynamic_flag_unhook dynamic_flag_dummy
 #define dynamic_flag_rehook dynamic_flag_dummy
 #define dynamic_flag_init_lib dynamic_flag_init_lib_dummy
+
 #endif
 
 #if DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 0
@@ -177,7 +179,8 @@ void dynamic_flag_init_lib(void);
 
 /*
  * Fallback implementation: mov a constant into a variable, and let
- * the compiler test on that.
+ * the compiler test on the resulting value.  We flip a dynamic flag
+ * by modifying the immediate literal value in the mov instruction.
  *
  * 0xF4 is HLT, a privileged instruction that shuts down the core; it
  * should be rare in machine code, so we'll be able to figure out if
@@ -198,30 +201,30 @@ void dynamic_flag_init_lib(void);
 #define DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED,			\
     KIND, NAME, FILE, LINE)						\
 	({								\
-	    unsigned char r;						\
+		unsigned char r;					\
 									\
-	    asm ("1:\n\t"						\
-		 "movb $"#DEFAULT", %0\n\t"				\
+		asm("1:\n\t"						\
+		    "movb $"#DEFAULT", %0\n\t"				\
 									\
-		 ".pushsection .rodata\n\t"				\
-		 "2: .asciz \"" #KIND ":" #NAME "@" FILE ":" #LINE "\"\n\t" \
-		 ".popsection\n\t"					\
+		    ".pushsection .rodata\n\t"				\
+		    "2: .asciz \"" #KIND ":" #NAME "@" FILE ":" #LINE "\"\n\t" \
+		    ".popsection\n\t"					\
 									\
-		 ".pushsection dynamic_flag_list,\"a\",@progbits\n\t"	\
-		 "3:\n\t"						\
-		 ".quad 1b\n\t"						\
-		 ".quad 0\n\t"						\
-		 ".quad 2b\n\t"						\
-		 ".byte "#INITIAL"\n\t"					\
-		 ".byte "#FLIPPED"\n\t"					\
-		 ".fill 6\n\t"						\
-		 ".popsection\n\t"					\
+		    ".pushsection dynamic_flag_list,\"a\",@progbits\n\t" \
+		    "3:\n\t"						\
+		    ".quad 1b\n\t"					\
+		    ".quad 0\n\t"					\
+		    ".quad 2b\n\t"					\
+		    ".byte "#INITIAL"\n\t"				\
+		    ".byte "#FLIPPED"\n\t"				\
+		    ".fill 6\n\t"					\
+		    ".popsection\n\t"					\
 									\
-		 ".pushsection dynamic_flag_"#KIND"_list,\"a\",@progbits\n\t"\
-		 ".quad 3b\n\t"						\
-		 ".popsection"						\
-		:"=r"(r));						\
-	    !!r;							\
+		    ".pushsection dynamic_flag_"#KIND"_list,\"a\",@progbits\n\t" \
+		    ".quad 3b\n\t"					\
+		    ".popsection"					\
+		    :"=r"(r));						\
+		!!r;							\
 	})
 
 #elif DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 2
@@ -234,6 +237,36 @@ void dynamic_flag_init_lib(void);
  *
  * Using `testl` as our quasi-noop makes it possible to encode the
  * jump offset statically.
+ *
+ * Implementation details:
+ *
+ *  The first line introduces a local label just before a 5-byte
+ *   testl $..., %eax.
+ *  We use that instruction instead of a nop (and declare a clobber on
+ *  EFLAGS) to simplify hotpatching with concurrent execution: we
+ *  can turn TEST into a JMP REL to foo_hook with a byte write.
+ *
+ *  The rest stashes metadata in a couple sections.
+ *
+ *   1. the name of the hook, in the normal read-only section.
+ *   2. the hook struct:
+ *        - a pointer to the hook instruction;
+ *        - the address of the destination;
+ *        - a pointer to the hook name (as a C string).
+ *   3. a reference to the struct, in the kind's custom section.
+ *
+ *  The if condition tells the compiler to skip the next block of code
+ *  (the conditional is false) and to consider it unlikely to be
+ *  executed, despite the asm-visible label.
+ *
+ * Numerical labels (from 1 to 9) can be repeated however many times
+ * as necessary; "1f" refers to the next label named 1 (1 forward),
+ * while "1b" searches backward.
+ *
+ * The push/pop section stuff gives us out of line metadata from a
+ * contiguous macro expansion.
+ *
+ * Inspired by tracepoints in the Linux kernel. <http://lwn.net/Articles/350714/>
  */
 
 #define DYNAMIC_FLAG_VALUE_ACTIVE 0xe9 /* jmp rel 32 */
@@ -248,44 +281,42 @@ void dynamic_flag_init_lib(void);
 #define DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED,			\
     KIND, NAME, FILE, LINE)						\
 	({								\
-	    __label__ DYNAMIC_FLAG_IMPL_label;				\
-	    unsigned char r = 0;					\
+		__label__ DYNAMIC_FLAG_IMPL_label;			\
+		unsigned char r = 0;					\
 									\
-	    asm goto ("1:\n\t"						\
-		      ".byte "#DEFAULT"\n\t"				\
-		      ".long %l[DYNAMIC_FLAG_IMPL_label] - (1b + 5)\n\t"\
+		asm goto("1:\n\t"					\
+			 ".byte "#DEFAULT"\n\t"				\
+			 ".long %l[DYNAMIC_FLAG_IMPL_label] - (1b + 5)\n\t" \
 									\
-		      ".pushsection .rodata\n\t"			\
-		      "2: .asciz \"" #KIND ":" #NAME "@" FILE ":" #LINE "\"\n\t" \
-		      ".popsection\n\t"					\
+			 ".pushsection .rodata\n\t"			\
+			 "2: .asciz \"" #KIND ":" #NAME "@" FILE ":" #LINE "\"\n\t" \
+			 ".popsection\n\t"				\
 									\
-		      ".pushsection dynamic_flag_list,\"a\",@progbits\n\t"\
-		      "3:\n\t"						\
-		      ".quad 1b\n\t"					\
-		      ".quad %l[DYNAMIC_FLAG_IMPL_label]\n\t" 	\
-		      ".quad 2b\n\t"					\
-		      ".byte "#INITIAL"\n\t"				\
-		      ".byte "#FLIPPED"\n\t"				\
-		      ".fill 6\n\t"					\
-		      ".popsection\n\t"					\
+			 ".pushsection dynamic_flag_list,\"a\",@progbits\n\t" \
+			 "3:\n\t"					\
+			 ".quad 1b\n\t"					\
+			 ".quad %l[DYNAMIC_FLAG_IMPL_label]\n\t" 	\
+			 ".quad 2b\n\t"					\
+			 ".byte "#INITIAL"\n\t"				\
+			 ".byte "#FLIPPED"\n\t"				\
+			 ".fill 6\n\t"					\
+			 ".popsection\n\t"				\
 									\
-		      ".pushsection dynamic_flag_"#KIND"_list,\"a\",@progbits\n\t" \
-		      ".quad 3b\n\t"					\
-		      ".popsection"					\
-		      ::: "cc" : DYNAMIC_FLAG_IMPL_label);		\
-	    if (0) {							\
-	    DYNAMIC_FLAG_IMPL_label: DYNAMIC_FLAG_IMPL_COLD;		\
-		    r = 1;						\
-	    }								\
+			 ".pushsection dynamic_flag_"#KIND"_list,\"a\",@progbits\n\t" \
+			 ".quad 3b\n\t"					\
+			 ".popsection"					\
+			 ::: "cc" : DYNAMIC_FLAG_IMPL_label);		\
+		if (0) {						\
+		DYNAMIC_FLAG_IMPL_label: DYNAMIC_FLAG_IMPL_COLD;	\
+			r = 1;						\
+		}							\
 									\
-	    r;								\
+		r;							\
 	})
 #endif
 
-#define DYNAMIC_FLAG_IMPL(DEFAULT, INITIAL, FLIPPED,			\
-			  KIND, NAME, FILE, LINE)			\
-	DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED,			\
-			   KIND, NAME, FILE, LINE)
+#define DYNAMIC_FLAG_IMPL(DEFAULT, INITIAL, FLIPPED, KIND, NAME, FILE, LINE) \
+	DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED, KIND, NAME, FILE, LINE)
 
 inline int
 dynamic_flag_dummy(const char *regex)
