@@ -395,43 +395,6 @@ cmp_patches(const void *x, const void *y)
 	return ((*a)->hook < (*b)->hook) ? -1 : 1;
 }
 
-static int
-cmp_patches_alpha(const void *x, const void *y)
-{
-	const struct patch_record * const *a = x;
-	const struct patch_record * const *b = y;
-	const char *a_name = (*a)->name;
-	const char *b_name = (*b)->name;
-	const char *a_colon, *b_colon;
-	unsigned long long a_line, b_line;
-	ssize_t colon_idx;
-	int r;
-
-	a_colon = strrchr(a_name, ':');
-	b_colon = strrchr(b_name, ':');
-	colon_idx = a_colon - a_name;
-
-	/* If the prefixes definitely don't match, just strcmp. */
-	if (a_colon == NULL || b_colon == NULL ||
-	    (colon_idx != b_colon - b_name)) {
-		return strcmp(a_name, b_name);
-	}
-
-	r = strncmp(a_name, b_name, colon_idx);
-	if (r != 0) {
-		return r;
-	}
-
-	a_line = strtoull(a_colon + 1, NULL, 10);
-	b_line = strtoull(b_colon + 1, NULL, 10);
-	if (a_line == b_line) {
-		return 0;
-	}
-
-	return (a_line < b_line) ? -1 : 1;
-}
-
-
 static void
 init_all(void)
 {
