@@ -37,7 +37,7 @@
 extern int dynamic_flag_dummy(const char *regex);
 extern void dynamic_flag_init_lib_dummy(void);
 
-#if DYNAMIC_FLAG_ENABLED
+#if DYNAMIC_FLAG_IMPLEMENTATION_STYLE > 0
 
 struct patch_record {
 	void *hook;
@@ -148,7 +148,7 @@ dummy(void)
 	AN_HOOK_DUMMY(none);
 }
 
-#if !DYNAMIC_FLAG_FALLBACK
+#if DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 2
 #define HOOK_SIZE 5
 
 static void
@@ -635,4 +635,4 @@ dynamic_flag_init_lib(void)
 	return;
 }
 
-#endif /* DYNAMIC_FLAG_ENABLED */
+#endif  /* DYNAMIC_FLAG_IMPLEMENTATION_STYLE > 0 */

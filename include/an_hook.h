@@ -1,14 +1,38 @@
 #pragma once
 
-#ifndef DYNAMIC_FLAG_ENABLED
-# if defined(__GNUC__)
-#  define DYNAMIC_FLAG_ENABLED 1
+/*
+ * Choose the implementation style:
+ *
+ *  0: fallback that hardcodes each flag to its default "safe" value
+ *  1: dynamic flag implementation that only needs extended inline asm
+ *  2: dynamic flag implementation that takes advantages of asm goto
+ */
+#ifndef DYNAMIC_FLAG_IMPLEMENTATION_STYLE
+# if !defined(__GNUC__)
+#  define DYNAMIC_FLAG_IMPLEMENTATION_STYLE 0
+# elif defined(__clang_analyzer__) || defined(__COVERITY__) || defined(__CHECKER__)
+#  define DYNAMIC_FLAG_IMPLEMENTATION_STYLE 1
+# elif defined(__clang_major__)
+#  if __clang_major__ >= 9  /* Need that for asm goto */
+#   define DYNAMIC_FLAG_IMPLEMENTATION_STYLE 2
+#  else
+#   define DYNAMIC_FLAG_IMPLEMENTATION_STYLE 1
+#  endif
+# elif __GNUC__ >= 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
+   /* GCC gained asm goto in 4.5 */
+#  define DYNAMIC_FLAG_IMPLEMENTATION_STYLE 2
 # else
-#  define DYNAMIC_FLAG_ENABLED 0
+#  define DYNAMIC_FLAG_IMPLEMENTATION_STYLE 1
 # endif
 #endif
 
-#if DYNAMIC_FLAG_ENABLED
+#if DYNAMIC_FLAG_IMPLEMENTATION_STYLE < 0 || DYNAMIC_FLAG_IMPLEMENTATION_STYLE > 2
+# error "Invalid DYNAMIC_FLAG_IMPLEMENTATION_STYLE value.  " \
+	"Must be 0 (static flag), 1 (non-asm-goto fallback), "	\
+	"or 2 (preferred asm-goto implementation)."
+#endif
+
+#if DYNAMIC_FLAG_IMPLEMENTATION_STYLE > 0
 /**
  * @brief Conditionally enable a block of code with a named hook.
  *
@@ -64,15 +88,7 @@
  * we're running on hundreds of machines.
  */
 
-#ifndef DYNAMIC_FLAG_FALLBACK
-# if defined(__clang__) || defined(__COVERITY__)
-#   define DYNAMIC_FLAG_FALLBACK 1
-# else
-#   define DYNAMIC_FLAG_FALLBACK 0
-# endif
-#endif
-
-#if !DYNAMIC_FLAG_FALLBACK
+#if DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 2
 #define DYNAMIC_FLAG_VALUE_ACTIVE 0xe9 /* jmp rel 32 */
 #define DYNAMIC_FLAG_VALUE_INACTIVE 0xa9 /* testl $, %eax */
 
@@ -275,7 +291,7 @@ void dynamic_flag_init_lib(void);
 
 #define dynamic_flag_activate_kind(KIND, PATTERN) dynamic_flag_activate((PATTERN))
 #define dynamic_flag_deactivate_kind(KIND, PATTERN) dynamic_flag_deactivate((PATTERN))
-#endif /* !DYNAMIC_FLAG_ENABLED */
+#endif
 
 inline int
 dynamic_flag_dummy(const char *regex)
