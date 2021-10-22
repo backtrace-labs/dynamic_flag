@@ -1,7 +1,7 @@
-#include <stdio.h>
-
 #include "dynamic_flag.h"
 
+#include <stddef.h>
+#include <stdio.h>
 
 static void
 run_all(void)
@@ -114,7 +114,7 @@ int main(int argc, char **argv)
 	run_all();
 
 	printf("\nDeactivating feature_flag:.*\n");
-	dynamic_flag_deactivate_kind(feature_flag, ".*");
+	dynamic_flag_deactivate_kind(feature_flag, NULL);
 	run_all();
 
 	printf("\nRehooking feature_flag:.*");
@@ -123,7 +123,7 @@ int main(int argc, char **argv)
 	run_all();
 
 	printf("\nDeactivating feature_flag\n");
-	dynamic_flag_deactivate_kind(feature_flag, ".*");
+	dynamic_flag_deactivate_kind(feature_flag, NULL);
 	run_all();
 
 	return 0;

@@ -1,5 +1,60 @@
 #pragma once
 
+/**
+ * The dynamic flag library defines global feature flags inline in
+ * code.  For example, a `DF_FEATURE(kind, name)` expression defines a
+ * feature flag named `name` in namespace `kind`, and evaluates to the
+ * 0/1 truth value of that flag.
+ *
+ * Flags can be toggled by regex (`dynamic_flag_activate` /
+ * `dynamic_flag_deactivate`) on the flags' full names:
+ * `kind:name@file:line`.  Any flag with an strictly positive
+ * activation count is true; activation counts are stored in a
+ * `uint64_t`, and it takes n deactivations to turn a flag off after n
+ * activations (including the initial one, if the flag defaults to
+ * true).  However, deactivations saturate at 0.
+ *
+ * For programmatic flag flipping, it's often convenient to restrict
+ * the regex to a specific `kind` namespace known at compile-time.
+ * `dynamic_flag_activate_kind` / `dynamic_flag_deactivate_kind` offer
+ * that functionality, with a nullable regex on the flags' full names.
+ *
+ * While activation counts saturate at 0 when deactivated, it's also
+ * possible to "unhook" flags: a flag's unhook counter is initially 0,
+ * incremented by each call to `dynamic_flag_unhook` for which the
+ * flag's name matches the regex, and decremented by each call to
+ * `dynamic_flag_rehook` when the flag's name matches the regex.  The
+ * unhook counter too saturates at 0.
+ *
+ * When a flag's unhook counter is strictly positive, any attempt to
+ * activate that flag will no-op, while (saturating) deactivations
+ * will still go through.  This lets operators ensure flags remain
+ * disabled when they would otherwise be activated programmatically.
+ *
+ * These regular expressions are POSIX extended regular expressions
+ * implicitly anchored at the beginning of the flag name, but not at
+ * the end of flag names.  Regular expressions can start with "^" to
+ * make the start anchor explicit; otherwise, the pattern is
+ * implicitly prefixed with a caret (left anchor).  The regular
+ * expressions must use a `$` ancor to match (only) the full flag
+ * name, and may start with `.*` to start matching from any location.
+ *
+ * The dynamic flag library is thread-safe but not async-signal-safe,
+ * and can safely manipulate flags while other threads are evaluating
+ * `DF_FEATURE` and similar dynamic flag expressions.  Whether the
+ * surrounding application logic is ready for a flag's value to change
+ * at runtime is a different question.
+ *
+ * Flags are most commonly manipulated at application startup.  It may
+ * be convenient to describe these startup-time flag flips with a list
+ * (the evlauation order is important: activation and unhook counts
+ * saturate, and activation is a no-op for unhooked flags) of strings
+ * in a configuration file.  For example, "+[regex]" could invoke
+ * `dynamic_flag_activate` on that regex, "-[regex]" invoke
+ * `dynamic_flag_deactivate`, "!regex" invoke `dynamic_flag_unhook`,
+ * and, if necessary, "?regex" could invoke `dynamic_flag_rehook`.
+ */
+
 /*
  * Choose the implementation style:
  *
@@ -107,8 +162,8 @@
 
 #if DYNAMIC_FLAG_IMPLEMENTATION_STYLE != 0
 /**
- * @brief (de)activate all hooks of kind @a KIND; if @a PATTERN is
- *  non-NULL, the hook names must match @a PATTERN as a regex.
+ * @brief (de)activate all flags of kind @a KIND; if @a PATTERN is
+ *  non-NULL, the flag names must match @a PATTERN as a regex.
  */
 #define dynamic_flag_activate_kind(KIND, PATTERN)			\
 	do {								\
@@ -137,28 +192,28 @@
 	} while (0)
 
 /**
- * @brief activate all hooks that match @a regex, regardless of the kind.
+ * @brief activate all flags that match @a regex, regardless of the kind.
  * @return negative on failure, 0 on success.
  */
 int dynamic_flag_activate(const char *regex);
 
 /**
- * @brief deactivate all hooks that match @a regex, regardless of the kind.
+ * @brief deactivate all flags that match @a regex, regardless of the kind.
  * @return negative on failure, 0 on success.
  */
 int dynamic_flag_deactivate(const char *regex);
 
 /**
- * @brief disable hooking for all hooks that match @a regex, regardless of the kind.
+ * @brief disable hooking for all flags that match @a regex, regardless of the kind.
  * @return negative on failure, 0 on success.
  *
- * If a hook is unhooked, activating that hook does nothing and does
+ * If a flag is unhooked, activating that flag does nothing and does
  * not increment the activation count.
  */
 int dynamic_flag_unhook(const char *regex);
 
 /**
- * @brief reenable hooking all hooks that match @a regex, regardless of the kind.
+ * @brief reenable hooking all flags that match @a regex, regardless of the kind.
  * @return negative on failure, 0 on success.
  */
 int dynamic_flag_rehook(const char *regex);
@@ -261,11 +316,11 @@ void dynamic_flag_init_lib(void);
  *
  *  The rest stashes metadata in a couple sections.
  *
- *   1. the name of the hook, in the normal read-only section.
+ *   1. the name of the flag, in the normal read-only section.
  *   2. the hook struct:
  *        - a pointer to the hook instruction;
  *        - the address of the destination;
- *        - a pointer to the hook name (as a C string).
+ *        - a pointer to the flag name (as a C string).
  *   3. a reference to the struct, in the kind's custom section.
  *
  *  The if condition tells the compiler to skip the next block of code
