@@ -69,7 +69,7 @@ static struct {
 	size_t size;
 } counts = { NULL };
 
-extern const struct patch_record __start_an_hook_list[], __stop_an_hook_list[];
+extern const struct patch_record __start_dynamic_flag_list[], __stop_dynamic_flag_list[];
 
 static void init_all(void);
 
@@ -116,7 +116,7 @@ lock(void)
 	assert(mutex_ret == 0);
 
 	if (__builtin_expect((counts.data == NULL), 0)) {
-		size_t n = __stop_an_hook_list - __start_an_hook_list;
+		size_t n = __stop_dynamic_flag_list - __start_dynamic_flag_list;
 
 		counts.data = calloc(n, sizeof(*counts.data));
 		counts.size = n;
@@ -223,7 +223,7 @@ default_patch(const struct patch_record *record)
 {
 	size_t i;
 
-	i = record - __start_an_hook_list;
+	i = record - __start_dynamic_flag_list;
 
 	assert(i < counts.size && "Hook out of bounds?!");
 
@@ -329,14 +329,14 @@ static int
 find_records(const char *pattern, struct patch_list *acc)
 {
 	regex_t regex;
-	size_t n = __stop_an_hook_list - __start_an_hook_list;
+	size_t n = __stop_dynamic_flag_list - __start_dynamic_flag_list;
 
 	if (regcomp(&regex, pattern, REG_EXTENDED | REG_NOSUB) != 0) {
 		return -1;
 	}
 
 	for (size_t i = 0; i < n; i++) {
-		const struct patch_record *record = __start_an_hook_list + i;
+		const struct patch_record *record = __start_dynamic_flag_list + i;
 
 		if (regexec(&regex, record->name, 0, NULL, 0) != REG_NOMATCH) {
 			patch_list_push(acc, record);
@@ -415,7 +415,7 @@ activate_all(struct patch_list *arr)
 	lock();
 	for (size_t i = 0; i < arr->size; i++) {
 		const struct patch_record *record = arr->data[i];
-		size_t offset = record - __start_an_hook_list;
+		size_t offset = record - __start_dynamic_flag_list;
 
 		if (counts.data[offset].unhook > 0) {
 			continue;
@@ -447,7 +447,7 @@ deactivate_all(struct patch_list *records)
 	lock();
 	for (size_t i = 0; i < records->size; i++) {
 		const struct patch_record *record = records->data[i];
-		size_t offset = record - __start_an_hook_list;
+		size_t offset = record - __start_dynamic_flag_list;
 
 		if (counts.data[offset].activation > 0 &&
 		    --counts.data[offset].activation == 0) {
@@ -470,7 +470,7 @@ rehook_all(struct patch_list *records)
 	lock();
 	for (size_t i = 0; i < records->size; i++) {
 		const struct patch_record *record = records->data[i];
-		size_t offset = record - __start_an_hook_list;
+		size_t offset = record - __start_dynamic_flag_list;
 
 		if (counts.data[offset].unhook > 0) {
 			counts.data[offset].unhook--;
@@ -489,7 +489,7 @@ unhook_all(struct patch_list *records)
 	lock();
 	for (size_t i = 0; i < records->size; i++) {
 		const struct patch_record *record = records->data[i];
-		size_t offset = record - __start_an_hook_list;
+		size_t offset = record - __start_dynamic_flag_list;
 
 		counts.data[offset].unhook++;
 	}

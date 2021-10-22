@@ -80,28 +80,28 @@
 	if (__builtin_expect(({						\
 	    asm goto ("1:\n\t"						\
 		      ".byte "#OPCODE"\n\t"				\
-		      ".long %l[an_hook_"#GENSYM"_label] - (1b + 5)\n\t"\
+		      ".long %l[dynamic_flag_"#GENSYM"_label] - (1b + 5)\n\t"\
 									\
 		      ".pushsection .rodata\n\t"			\
 		      "2: .asciz \"" #KIND ":" #NAME "@" FILE ":" #LINE "\"\n\t" \
 		      ".popsection\n\t"					\
 									\
-		      ".pushsection an_hook_list,\"a\",@progbits\n\t"	\
+		      ".pushsection dynamic_flag_list,\"a\",@progbits\n\t"\
 		      "3:\n\t"						\
 		      ".quad 1b\n\t"					\
-		      ".quad %l[an_hook_"#GENSYM"_label]\n\t" 		\
+		      ".quad %l[dynamic_flag_"#GENSYM"_label]\n\t" 	\
 		      ".quad 2b\n\t"					\
 		      ".byte "#INITIAL"\n\t"				\
 		      ".byte "#FLIPPED"\n\t"				\
 		      ".fill 6\n\t"					\
 		      ".popsection\n\t"					\
 									\
-		      ".pushsection an_hook_"#KIND"_list,\"a\",@progbits\n\t" \
+		      ".pushsection dynamic_flag_"#KIND"_list,\"a\",@progbits\n\t" \
 		      ".quad 3b\n\t"					\
 		      ".popsection"					\
-		      ::: "cc" : an_hook_##GENSYM##_label);		\
+		      ::: "cc" : dynamic_flag_##GENSYM##_label);		\
 	    0;}), 0))							\
-	an_hook_##GENSYM##_label:
+	dynamic_flag_##GENSYM##_label:
 #else /* Fallback implementation */
 /*
  * 0xF4 is HLT, a privileged instruction that shuts down the core.
@@ -120,7 +120,7 @@
 		 "2: .asciz \"" #KIND ":" #NAME "@" FILE ":" #LINE "\"\n\t" \
 		 ".popsection\n\t"					\
 									\
-		 ".pushsection an_hook_list,\"a\",@progbits\n\t"	\
+		 ".pushsection dynamic_flag_list,\"a\",@progbits\n\t"	\
 		 "3:\n\t"						\
 		 ".quad 1b\n\t"						\
 		 ".quad 0\n\t"						\
@@ -130,7 +130,7 @@
 		 ".fill 6\n\t"						\
 		 ".popsection\n\t"					\
 									\
-		 ".pushsection an_hook_"#KIND"_list,\"a\",@progbits\n\t"\
+		 ".pushsection dynamic_flag_"#KIND"_list,\"a\",@progbits\n\t"\
 		 ".quad 3b\n\t"						\
 		 ".popsection"						\
 		:"=r"(r));						\
@@ -196,11 +196,11 @@
 	do {								\
 		int an_hook_activate_kind_inner(const void **start,	\
 		    const void **end, const char *regex);		\
-		extern const void *__start_an_hook_##KIND##_list[];	\
-		extern const void *__stop_an_hook_##KIND##_list[]; 	\
+		extern const void *__start_dynamic_flag_##KIND##_list[];\
+		extern const void *__stop_dynamic_flag_##KIND##_list[]; \
 									\
-		an_hook_activate_kind_inner(__start_an_hook_##KIND##_list, \
-		    __stop_an_hook_##KIND##_list,			\
+		an_hook_activate_kind_inner(__start_dynamic_flag_##KIND##_list, \
+		    __stop_dynamic_flag_##KIND##_list,			\
 		    (PATTERN));						\
 	} while (0)
 
@@ -208,11 +208,11 @@
 	do {								\
 		int an_hook_deactivate_kind_inner(const void **start,	\
 		    const void **end, const char *regex);		\
-		extern const void *__start_an_hook_##KIND##_list[];	\
-		extern const void *__stop_an_hook_##KIND##_list[]; 	\
+		extern const void *__start_dynamic_flag_##KIND##_list[];\
+		extern const void *__stop_dynamic_flag_##KIND##_list[]; \
 									\
-		an_hook_deactivate_kind_inner(__start_an_hook_##KIND##_list, \
-		    __stop_an_hook_##KIND##_list,			\
+		an_hook_deactivate_kind_inner(__start_dynamic_flag_##KIND##_list, \
+		    __stop_dynamic_flag_##KIND##_list,			\
 		    (PATTERN));						\
 	} while (0)
 
