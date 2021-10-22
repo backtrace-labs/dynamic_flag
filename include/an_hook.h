@@ -1,14 +1,14 @@
 #pragma once
 
-#ifndef AN_HOOK_ENABLED
+#ifndef DYNAMIC_FLAG_ENABLED
 # if defined(__GNUC__)
-#  define AN_HOOK_ENABLED 1
+#  define DYNAMIC_FLAG_ENABLED 1
 # else
-#  define AN_HOOK_ENABLED 0
+#  define DYNAMIC_FLAG_ENABLED 0
 # endif
 #endif
 
-#if AN_HOOK_ENABLED
+#if DYNAMIC_FLAG_ENABLED
 /**
  * @brief Conditionally enable a block of code with a named hook.
  *
@@ -64,15 +64,15 @@
  * we're running on hundreds of machines.
  */
 
-#ifndef AN_HOOK_FALLBACK
+#ifndef DYNAMIC_FLAG_FALLBACK
 # if defined(__clang__) || defined(__COVERITY__)
-#   define AN_HOOK_FALLBACK 1
+#   define DYNAMIC_FLAG_FALLBACK 1
 # else
-#   define AN_HOOK_FALLBACK 0
+#   define DYNAMIC_FLAG_FALLBACK 0
 # endif
 #endif
 
-#if !AN_HOOK_FALLBACK
+#if !DYNAMIC_FLAG_FALLBACK
 #define DYNAMIC_FLAG_VALUE_ACTIVE 0xe9 /* jmp rel 32 */
 #define DYNAMIC_FLAG_VALUE_INACTIVE 0xa9 /* testl $, %eax */
 
@@ -135,7 +135,7 @@
 		 ".popsection"						\
 		:"=r"(r));						\
 	    r;}), 0))
-#endif /* AN_HOOK_FALLBACK */
+#endif /* DYNAMIC_FLAG_FALLBACK */
 
 #define AN_HOOK_IMPL(OPCODE, INITIAL, FLIPPED, KIND, NAME, FILE, LINE, GENSYM) \
 	AN_HOOK_IMPL_(OPCODE, INITIAL, FLIPPED, KIND, NAME, FILE, LINE, GENSYM)
@@ -192,26 +192,28 @@
  * @brief (de)activate all hooks of kind @a KIND; if @a PATTERN is
  *  non-NULL, the hook names must match @a PATTERN as a regex.
  */
-#define an_hook_activate_kind(KIND, PATTERN)				\
+#define dynamic_flag_activate_kind(KIND, PATTERN)			\
 	do {								\
-		int an_hook_activate_kind_inner(const void **start,	\
+		int dynamic_flag_activate_kind_inner(const void **start,\
 		    const void **end, const char *regex);		\
 		extern const void *__start_dynamic_flag_##KIND##_list[];\
 		extern const void *__stop_dynamic_flag_##KIND##_list[]; \
 									\
-		an_hook_activate_kind_inner(__start_dynamic_flag_##KIND##_list, \
+		dynamic_flag_activate_kind_inner(			\
+		    __start_dynamic_flag_##KIND##_list,			\
 		    __stop_dynamic_flag_##KIND##_list,			\
 		    (PATTERN));						\
 	} while (0)
 
-#define an_hook_deactivate_kind(KIND, PATTERN)				\
+#define dynamic_flag_deactivate_kind(KIND, PATTERN)			\
 	do {								\
-		int an_hook_deactivate_kind_inner(const void **start,	\
+		int dynamic_flag_deactivate_kind_inner(const void **start,\
 		    const void **end, const char *regex);		\
 		extern const void *__start_dynamic_flag_##KIND##_list[];\
 		extern const void *__stop_dynamic_flag_##KIND##_list[]; \
 									\
-		an_hook_deactivate_kind_inner(__start_dynamic_flag_##KIND##_list, \
+		dynamic_flag_deactivate_kind_inner(			\
+		    __start_dynamic_flag_##KIND##_list,			\
 		    __stop_dynamic_flag_##KIND##_list,			\
 		    (PATTERN));						\
 	} while (0)
@@ -226,13 +228,13 @@
  * @brief activate all hooks that match @a regex, regardless of the kind.
  * @return negative on failure, 0 on success.
  */
-int an_hook_activate(const char *regex);
+int dynamic_flag_activate(const char *regex);
 
 /**
  * @brief deactivate all hooks that match @a regex, regardless of the kind.
  * @return negative on failure, 0 on success.
  */
-int an_hook_deactivate(const char *regex);
+int dynamic_flag_deactivate(const char *regex);
 
 /**
  * @brief disable hooking for all hooks that match @a regex, regardless of the kind.
@@ -241,20 +243,20 @@ int an_hook_deactivate(const char *regex);
  * If a hook is unhooked, activating that hook does nothing and does
  * not increment the activation count.
  */
-int an_hook_unhook(const char *regex);
+int dynamic_flag_unhook(const char *regex);
 
 /**
  * @brief reenable hooking all hooks that match @a regex, regardless of the kind.
  * @return negative on failure, 0 on success.
  */
-int an_hook_rehook(const char *regex);
+int dynamic_flag_rehook(const char *regex);
 
 /**
- * @brief initializes the an_hook subsystem.
+ * @brief initializes the dynamic_flag subsystem.
  *
  * It is safe if useless to call this function multiple times.
  */
-void an_hook_init_lib(void);
+void dynamic_flag_init_lib(void);
 
 #else
 
@@ -265,18 +267,18 @@ void an_hook_init_lib(void);
 #define AN_HOOK_FLIP_OFF(KIND, NAME) if (1)
 #define AN_HOOK_DUMMY(KIND) do { } while (0)
 
-#define an_hook_activate an_hook_dummy
-#define an_hook_deactivate an_hook_dummy
-#define an_hook_unhook an_hook_dummy
-#define an_hook_rehook an_hook_dummy
-#define an_hook_init_lib an_hook_init_lib_dummy
+#define dynamic_flag_activate dynamic_flag_dummy
+#define dynamic_flag_deactivate dynamic_flag_dummy
+#define dynamic_flag_unhook dynamic_flag_dummy
+#define dynamic_flag_rehook dynamic_flag_dummy
+#define dynamic_flag_init_lib dynamic_flag_init_lib_dummy
 
-#define an_hook_activate_kind(KIND, PATTERN) an_hook_activate((PATTERN))
-#define an_hook_deactivate_kind(KIND, PATTERN) an_hook_deactivate((PATTERN))
-#endif /* !AN_HOOK_ENABLED */
+#define dynamic_flag_activate_kind(KIND, PATTERN) dynamic_flag_activate((PATTERN))
+#define dynamic_flag_deactivate_kind(KIND, PATTERN) dynamic_flag_deactivate((PATTERN))
+#endif /* !DYNAMIC_FLAG_ENABLED */
 
 inline int
-an_hook_dummy(const char *regex)
+dynamic_flag_dummy(const char *regex)
 {
 
 	(void)regex;
@@ -284,8 +286,16 @@ an_hook_dummy(const char *regex)
 }
 
 inline void
-an_hook_init_lib_dummy(void)
+dynamic_flag_init_lib_dummy(void)
 {
 
 	return;
 }
+
+#define an_hook_activate dynamic_flag_activate
+#define an_hook_deactivate dynamic_flag_deactivate
+#define an_hook_unhook dynamic_flag_unhook
+#define an_hook_rehook dynamic_flag_rehook
+#define an_hook_init_lib dynamic_flag_init_lib
+#define an_hook_activate_kind dynamic_flag_activate_kind
+#define an_hook_deactivate_kind dynamic_flag_deactivate_kind

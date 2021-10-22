@@ -34,10 +34,10 @@
 #include <unistd.h>
 
 /* dummy stubs */
-extern int an_hook_dummy(const char *regex);
-extern void an_hook_init_lib_dummy(void);
+extern int dynamic_flag_dummy(const char *regex);
+extern void dynamic_flag_init_lib_dummy(void);
 
-#if AN_HOOK_ENABLED
+#if DYNAMIC_FLAG_ENABLED
 
 struct patch_record {
 	void *hook;
@@ -54,7 +54,6 @@ struct patch_count {
 	uint64_t unhook;
 };
 
-
 struct patch_list {
 	size_t size;
 	size_t capacity;
@@ -63,7 +62,10 @@ struct patch_list {
 
 static pthread_mutex_t patch_lock = PTHREAD_MUTEX_INITIALIZER;
 
-/* Hook records are in an array. For each hook record, count # of activations and disable calls. */
+/*
+ * Hook records are in an array. For each hook record, count # of
+ * activations and disable calls.
+ */
 static struct {
 	struct patch_count *data;
 	size_t size;
@@ -78,7 +80,7 @@ patch_list_create(void)
 {
 	struct patch_list *list;
 
-	assert(counts.size > 0  && "Must initialize an_hook first");
+	assert(counts.size > 0  && "Must initialize dynamic_flag first");
 	list = calloc(1, sizeof(*list) + counts.size * sizeof(list->data[0]));
 	assert(list != NULL);
 	list->size = 0;
@@ -146,7 +148,7 @@ dummy(void)
 	AN_HOOK_DUMMY(none);
 }
 
-#if !AN_HOOK_FALLBACK
+#if !DYNAMIC_FLAG_FALLBACK
 #define HOOK_SIZE 5
 
 static void
@@ -404,7 +406,7 @@ init_all(void)
 
 	acc = patch_list_create();
 	r = find_records("", acc);
-	assert(r == 0 && "an_hook init failed.");
+	assert(r == 0 && "dynamic_flag init failed.");
 
 	qsort(acc->data, acc->size, sizeof(acc->data[0]), cmp_patches);
 	amortize(acc, default_patch);
@@ -509,7 +511,7 @@ unhook_all(struct patch_list *records)
 }
 
 int
-an_hook_activate(const char *regex)
+dynamic_flag_activate(const char *regex)
 {
 	struct patch_list *acc;
 	int r;
@@ -528,7 +530,7 @@ out:
 }
 
 int
-an_hook_deactivate(const char *regex)
+dynamic_flag_deactivate(const char *regex)
 {
 	struct patch_list *acc;
 	int r;
@@ -547,7 +549,7 @@ out:
 }
 
 int
-an_hook_unhook(const char *regex)
+dynamic_flag_unhook(const char *regex)
 {
 	struct patch_list *acc;
 	int r;
@@ -566,7 +568,7 @@ out:
 }
 
 int
-an_hook_rehook(const char *regex)
+dynamic_flag_rehook(const char *regex)
 {
 	struct patch_list *acc;
 	int r;
@@ -585,7 +587,8 @@ out:
 }
 
 int
-an_hook_activate_kind_inner(const void **start, const void **end, const char *regex)
+dynamic_flag_activate_kind_inner(const void **start, const void **end,
+    const char *regex)
 {
 	struct patch_list *acc;
 	int r;
@@ -604,7 +607,8 @@ out:
 }
 
 int
-an_hook_deactivate_kind_inner(const void **start, const void **end, const char *regex)
+dynamic_flag_deactivate_kind_inner(const void **start, const void **end,
+    const char *regex)
 {
 	struct patch_list *acc;
 	int r;
@@ -623,7 +627,7 @@ out:
 }
 
 void
-an_hook_init_lib(void)
+dynamic_flag_init_lib(void)
 {
 
 	lock();
@@ -631,4 +635,4 @@ an_hook_init_lib(void)
 	return;
 }
 
-#endif /* AN_HOOK_ENABLED */
+#endif /* DYNAMIC_FLAG_ENABLED */
