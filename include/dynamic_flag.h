@@ -100,11 +100,13 @@
  * and is always false when the dynamic_flag library does not run.
  *
  * It is useful for experimental feature flags.
+ *
+ * The third argument is an optional docstring.
  */
-#define DF_FEATURE(KIND, NAME)						\
+#define DF_FEATURE(KIND, NAME, ...)					\
 	__builtin_expect(DYNAMIC_FLAG_IMPL(				\
 	    DYNAMIC_FLAG_VALUE_INACTIVE, DYNAMIC_FLAG_VALUE_INACTIVE, 0, \
-	    KIND, NAME, __FILE__, __LINE__),				\
+	    KIND, NAME, __FILE__, __LINE__, "" __VA_ARGS__),		\
         0)
 
 /**
@@ -112,11 +114,13 @@
  * and is always true when the dynamic_flag library does not run.
  *
  * It is useful for code that is usually enabled.
+ *
+ * The third argument is an optional docstring.
  */
-#define DF_DEFAULT(KIND, NAME)						\
+#define DF_DEFAULT(KIND, NAME, ...)					\
 	__builtin_expect(!DYNAMIC_FLAG_IMPL(				\
 	    DYNAMIC_FLAG_VALUE_INACTIVE, DYNAMIC_FLAG_VALUE_INACTIVE, 1, \
-	    KIND, NAME, __FILE__, __LINE__),				\
+	    KIND, NAME, __FILE__, __LINE__, "" __VA_ARGS__),		\
 	1)
 
 /**
@@ -125,11 +129,13 @@
  *
  * It is useful for code that is usually enabled, but should be
  * most efficient when disabled.
+ *
+ * The third argument is an optional docstring.
  */
-#define DF_DEFAULT_SLOW(KIND, NAME)					\
+#define DF_DEFAULT_SLOW(KIND, NAME, ...)				\
 	__builtin_expect(DYNAMIC_FLAG_IMPL(				\
 	    DYNAMIC_FLAG_VALUE_ACTIVE, DYNAMIC_FLAG_VALUE_ACTIVE, 0,	\
-	    KIND, NAME, __FILE__, __LINE__),				\
+	    KIND, NAME, __FILE__, __LINE__, "" __VA_ARGS__),		\
 	0)
 
 /**
@@ -139,21 +145,25 @@
  *
  * It is useful for code that is usually disabled, but should always
  * be safe to enable.
+ *
+ * The third argument is an optional docstring.
  */
-#define DF_OPT(KIND, NAME)						\
+#define DF_OPT(KIND, NAME, ...)						\
 	__builtin_expect(DYNAMIC_FLAG_IMPL(				\
 	    DYNAMIC_FLAG_VALUE_ACTIVE, DYNAMIC_FLAG_VALUE_INACTIVE, 0,	\
-	    KIND, NAME, __FILE__, __LINE__),				\
+	    KIND, NAME, __FILE__, __LINE__, "" __VA_ARGS__),		\
 	0)
 
 /**
  * Defines a flag for a given KIND: dynamic_flag_activate_kind and
  * dynamic_flag_deactivate_kind will fail to link if there are no
  * flag for that kind.
+ *
+ * The second argument is an optional docstring.
  */
-#define DYNAMIC_FLAG_DUMMY(KIND)					\
+#define DYNAMIC_FLAG_DUMMY(KIND, ...)					\
 	do {								\
-		if (DF_FEATURE(KIND, dummy)) {				\
+	  if (DF_FEATURE(KIND, dummy, ##__VA_ARGS__)) {			\
 			asm volatile("");				\
 		}							\
 	} while (0)
@@ -161,14 +171,20 @@
 /**
  * DF_DEBUG flags are enabled by default in regular builds, and
  * disabled by default in NDEBUG (release) builds.
+ *
+ * The second argument is an optional docstring.
  */
 #ifdef NDEBUG
-# define DF_DEBUG(NAME) DF_DEFAULT_SLOW(debug, NAME)
+# define DF_DEBUG(NAME, ...) DF_DEFAULT_SLOW(debug, NAME, ##__VA_ARGS__)
 #else
-# define DF_DEBUG(NAME) DF_FEATURE(debug, NAME)
+# define DF_DEBUG(NAME, ...) DF_FEATURE(debug, NAME, ##__VA_ARGS__)
 #endif
 
 #if DYNAMIC_FLAG_CTL_INTERFACE
+#include <stdbool.h>
+#include <stdint.h>
+#include <sys/types.h>
+
 #if DYNAMIC_FLAG_IMPLEMENTATION_STYLE != 0
 /**
  * @brief (de)activate all flags of kind @a KIND; if @a PATTERN is
@@ -228,6 +244,45 @@ int dynamic_flag_unhook(const char *regex);
 int dynamic_flag_rehook(const char *regex);
 
 /**
+ * Description for a given dynamic flag's state.
+ *
+ * All pointees have static lifetimes, and may be read outside the
+ * callback's invocation.  The C strings in `name` and `doc` are
+ * immutable, although the machine code at `hook` and `destination`
+ * may change.
+ */
+struct dynamic_flag_state {
+	const char *name;  /* Flag's full name (kind:name@file:line) */
+	const char *doc;  /* Docstring for the flag (empty string if none) */
+	uint64_t activation;  /* Number of activations (active if > 0) */
+	uint64_t unhook;  /* unhook depth (activations disabled if > 0) */
+	const void *hook;  /* Address of the hook instruction */
+
+	/*
+	 * This field is only useful if DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 2;
+	 * otherwise it's always 0.
+	 */
+	const void *destination;  /* Address of the slow path code. */
+	bool duplicate;
+};
+
+/**
+ * @brief invokes @a cb with a list of all flags that match @a regex, until
+ *   @a cb returns a non-zero value.
+ * @return -1 if we failed to compile the regex, the first non-zero value
+ *   returned by @a cb if any, or the number of flags listed otherwise.
+ */
+ssize_t dynamic_flag_list_state(const char *regex,
+    ssize_t (*cb)(void *ctx, const struct dynamic_flag_state *), void *ctx);
+
+/**
+ * @brief Prints all non-duplicate entries to the `FILE *` ctx, or to `stderr` if
+ *   NULL.
+ * @return 0.
+ */
+ssize_t dynamic_flag_list_fprintf_cb(void *ctx, const struct dynamic_flag_state *);
+
+/**
  * @brief initializes the dynamic_flag subsystem.
  *
  * It is safe if useless to call this function multiple times.
@@ -243,6 +298,7 @@ void dynamic_flag_init_lib(void);
 #define dynamic_flag_unhook dynamic_flag_dummy
 #define dynamic_flag_rehook dynamic_flag_dummy
 #define dynamic_flag_init_lib dynamic_flag_init_lib_dummy
+#define dynamic_flag_list dynamic_flag_list_state_dummy
 
 #endif  /* DYNAMIC_FLAG_IMPLEMENTATION_STYLE */
 #endif  /* DYNAMIC_FLAG_CTL_INTERFACE */
@@ -277,7 +333,7 @@ void dynamic_flag_init_lib(void);
 #define DYNAMIC_FLAG_VALUE_INACTIVE 0
 
 #define DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED,			\
-    KIND, NAME, FILE, LINE)						\
+    KIND, NAME, FILE, LINE, DOC)					\
 	({								\
 		unsigned char r;					\
 									\
@@ -286,6 +342,7 @@ void dynamic_flag_init_lib(void);
 									\
 		    ".pushsection .rodata\n\t"				\
 		    "2: .asciz \"" #KIND ":" #NAME "@" FILE ":" #LINE "\"\n\t" \
+		    ".asciz \"" DOC "\"\n\t"				\
 		    ".popsection\n\t"					\
 									\
 		    ".pushsection dynamic_flag_list,\"a\",@progbits\n\t" \
@@ -357,7 +414,7 @@ void dynamic_flag_init_lib(void);
 #endif
 
 #define DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED,			\
-    KIND, NAME, FILE, LINE)						\
+    KIND, NAME, FILE, LINE, DOC)						\
 	({								\
 		__label__ DYNAMIC_FLAG_IMPL_label;			\
 		unsigned char r = 0;					\
@@ -368,6 +425,7 @@ void dynamic_flag_init_lib(void);
 									\
 			 ".pushsection .rodata\n\t"			\
 			 "2: .asciz \"" #KIND ":" #NAME "@" FILE ":" #LINE "\"\n\t" \
+			 ".asciz \"" DOC "\"\n\t"			\
 			 ".popsection\n\t"				\
 									\
 			 ".pushsection dynamic_flag_list,\"a\",@progbits\n\t" \
@@ -393,8 +451,8 @@ void dynamic_flag_init_lib(void);
 	})
 #endif
 
-#define DYNAMIC_FLAG_IMPL(DEFAULT, INITIAL, FLIPPED, KIND, NAME, FILE, LINE) \
-	DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED, KIND, NAME, FILE, LINE)
+#define DYNAMIC_FLAG_IMPL(DEFAULT, INITIAL, FLIPPED, KIND, NAME, FILE, LINE, DOC) \
+	DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED, KIND, NAME, FILE, LINE, DOC)
 
 #if DYNAMIC_FLAG_CTL_INTERFACE
 inline int
@@ -411,4 +469,16 @@ dynamic_flag_init_lib_dummy(void)
 
 	return;
 }
+
+inline long long
+dynamic_flag_list_state_dummy(const char *regex,
+    long long (*cb)(void *ctx, const struct dynamic_flag_state *), void *ctx)
+{
+
+	(void)regex;
+	(void)cb;
+	(void)ctx;
+	return 0;
+}
 #endif  /* DYNAMIC_FLAG_CTL_INTERFACE */
+

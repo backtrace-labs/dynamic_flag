@@ -7,7 +7,9 @@ static void
 run_all(void)
 {
 
-	if (DF_OPT(off, printf1)) {
+	if (DF_OPT(off, printf1,
+	    "DF_OPT flags are usually disabled, "
+	    "but should always be safe to enable")) {
 		printf("off:printf1\n");
 	}
 
@@ -15,11 +17,14 @@ run_all(void)
 		printf("off:printf2\n");
 	}
 
-	if (DF_DEFAULT(on, printf1)) {
+	if (DF_DEFAULT(on, printf1,
+	    "DF_DEFAULT flags are enabled initially and when the library can't find them.")) {
 		printf("on:printf1\n");
 	}
 
-	if (DF_DEFAULT_SLOW(on, printf2)) {
+	if (DF_DEFAULT_SLOW(on, printf2,
+	    "DF_DEFAULT_SLOW flags are enabled like DF_DEFAULT, "
+	    "but instruct the compiler to expect them to be disabled.")) {
 		printf("on:printf2\n");
 	}
 
@@ -44,7 +49,10 @@ run_all(void)
 		printf("feature_flag:default_on\n");
 	}
 
-	if (DF_FEATURE(feature_flag, default_off)) {
+	if (DF_FEATURE(feature_flag, default_off,
+	    "DF_FEATURE flags are classic feature flags: off initially "
+	    "and if the dynamic_flag machine can't find them, "
+	    "and the compiler expects them to be disabled")) {
 		printf("feature_flag:default_off\n");
 	}
 
@@ -69,7 +77,8 @@ wrapped_deactivate(const char *pat)
 	return;
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
 
 	(void)argc;
@@ -78,6 +87,9 @@ int main(int argc, char **argv)
 	printf("Before init\n");
 	run_all();
 	dynamic_flag_init_lib();
+
+	printf("\nList all flags\n");
+	dynamic_flag_list_state(".*", dynamic_flag_list_fprintf_cb, NULL);
 
 	printf("\nInitial:\n");
 	run_all();

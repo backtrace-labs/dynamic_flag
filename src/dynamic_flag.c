@@ -38,12 +38,19 @@
 /* dummy stubs */
 extern int dynamic_flag_dummy(const char *regex);
 extern void dynamic_flag_init_lib_dummy(void);
+extern long long dynamic_flag_list_state_dummy(const char *regex,
+    long long (*cb)(void *ctx, const struct dynamic_flag_state *), void *ctx);
 
 #if DYNAMIC_FLAG_IMPLEMENTATION_STYLE > 0
 struct patch_record {
 	void *hook;
 	void *destination;
-	const char *name;
+	/*
+	 * The flag name as a C string, followed by a docstring; a
+	 * missing docstring is represented as an empty C string
+	 * (i.e., there's always a second NUL terminator).
+	 */
+	const char *name_doc;
 	uint8_t initial_opcode; /* initial value for fallback impl. */
 	uint8_t flipped;
 	uint8_t padding[6];
@@ -81,7 +88,7 @@ patch_list_create(void)
 {
 	struct patch_list *list;
 
-	assert(counts.size > 0  && "Must initialize dynamic_flag first");
+	assert(counts.size > 0 && "Must initialize dynamic_flag first");
 	list = calloc(1, sizeof(*list) + counts.size * sizeof(list->data[0]));
 	assert(list != NULL);
 	list->size = 0;
@@ -146,7 +153,10 @@ __attribute__((__used__)) static void
 dummy(void)
 {
 
-	DYNAMIC_FLAG_DUMMY(none);
+	DYNAMIC_FLAG_DUMMY(none,
+	    "This dummy flag does nothing. It lets the dynamic_flag library "
+	    "compile even when no other flag is defined.");
+	return;
 }
 
 #if DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 1
@@ -372,7 +382,7 @@ find_records(const char *pattern, struct patch_list *acc)
 	for (size_t i = 0; i < n; i++) {
 		const struct patch_record *record = __start_dynamic_flag_list + i;
 
-		if (regexec(&regex, record->name, 0, NULL, 0) != REG_NOMATCH) {
+		if (regexec(&regex, record->name_doc, 0, NULL, 0) != REG_NOMATCH) {
 			patch_list_push(acc, record);
 		}
 	}
@@ -396,7 +406,7 @@ find_records_kind(const void **start, const void **end, const char *pattern,
 		const struct patch_record *record = start[i];
 
 		if (pattern == NULL ||
-		    regexec(&regex, record->name, 0, NULL, 0) != REG_NOMATCH) {
+		    regexec(&regex, record->name_doc, 0, NULL, 0) != REG_NOMATCH) {
 			patch_list_push(acc, record);
 		}
 	}
@@ -607,6 +617,139 @@ dynamic_flag_rehook(const char *regex)
 out:
 	patch_list_destroy(acc);
 	return r;
+}
+
+static int
+cmp_patches_alpha(const void *x, const void *y)
+{
+	const struct patch_record * const *a = x;
+	const struct patch_record * const *b = y;
+	const char *a_name = (*a)->name_doc;
+	const char *b_name = (*b)->name_doc;
+	const char *a_colon, *b_colon;
+	unsigned long long a_line, b_line;
+	ssize_t colon_idx;
+	int r;
+
+	a_colon = strrchr(a_name, ':');
+	b_colon = strrchr(b_name, ':');
+	colon_idx = a_colon - a_name;
+
+	/* If the prefixes definitely don't match, just strcmp. */
+	if (a_colon == NULL || b_colon == NULL ||
+	    (colon_idx != b_colon - b_name)) {
+		return strcmp(a_name, b_name);
+	}
+
+	/* Compare everything up to the line number. */
+	r = strncmp(a_name, b_name, colon_idx);
+	if (r != 0) {
+		return r;
+	}
+
+	/* Same kind, name, file.  Show longer docstrings first. */
+	{
+		const char *a_doc;
+		const char *b_doc;
+
+		a_doc = a_colon + strlen(a_colon) + 1;
+		b_doc = b_colon + strlen(b_colon) + 1;
+
+		/* Only check if one has a docstring. */
+		if (a_doc[0] != '\0' || b_doc[0] != '\0') {
+			size_t a_doc_len;
+			size_t b_doc_len;
+
+			/* Only b has a docstring, it comes first. */
+			if (a_doc[0] == '\0') {
+				return 1;
+			}
+
+			/* Only a has a docstring, it comes first. */
+			if (b_doc[0] == '\0') {
+				return -1;
+			}
+
+			a_doc_len = strlen(a_doc);
+			b_doc_len = strlen(b_doc);
+
+			if (a_doc_len != b_doc_len) {
+				return (a_doc_len > b_doc_len) ? -1 : 1;
+			}
+		}
+	}
+
+	a_line = strtoull(a_colon + 1, NULL, 10);
+	b_line = strtoull(b_colon + 1, NULL, 10);
+	if (a_line != b_line) {
+		return (a_line < b_line) ? -1 : 1;
+	}
+
+	return 0;
+}
+
+ssize_t
+dynamic_flag_list_state(const char *regex,
+    ssize_t (*cb)(void *ctx, const struct dynamic_flag_state *), void *ctx)
+{
+	struct patch_list *acc;
+	ssize_t r;
+
+	acc = patch_list_create();
+	r = find_records(regex, acc);
+	if (r != 0) {
+		goto out;
+	}
+
+	qsort(acc->data, acc->size,
+	    sizeof(struct patch_record *), cmp_patches_alpha);
+
+	for (size_t i = 0; i < acc->size; i++) {
+		struct dynamic_flag_state state;
+		const struct patch_record *record = acc->data[i];
+		size_t record_idx = record - __start_dynamic_flag_list;
+
+		state = (struct dynamic_flag_state) {
+			.name = record->name_doc,
+			.doc = record->name_doc + 1 + strlen(record->name_doc),
+
+			/* Yeah, this is racy. */
+			.activation = counts.data[record_idx].activation,
+			.unhook = counts.data[record_idx].unhook,
+
+			.hook = record->hook,
+			.destination = record->destination,
+		};
+
+		if (i > 0 &&
+		    strcmp(acc->data[i - 1]->name_doc, acc->data[i]->name_doc) == 0)
+			state.duplicate = 1;
+
+		r = cb(ctx, &state);
+		if (r != 0)
+			goto out;
+	}
+
+	r = acc->size;
+
+out:
+	patch_list_destroy(acc);
+	return r;
+}
+
+ssize_t
+dynamic_flag_list_fprintf_cb(void *ctx, const struct dynamic_flag_state *state)
+{
+	FILE *stream = ctx ?: stderr;
+
+	if (state->duplicate == true)
+		return 0;
+
+	fprintf(stream, "%s (%s)%s%s\n",
+	    state->name, (state->activation > 0) ? "on":"off",
+	    (state->doc[0] == '\0') ? "" : ": ",
+	    state->doc);
+	return 0;
 }
 
 int
