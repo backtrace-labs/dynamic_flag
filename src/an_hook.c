@@ -23,6 +23,7 @@
 #include <dlfcn.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <pthread.h>
 #include <regex.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -31,8 +32,6 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-#include <pthread.h>
 
 /* dummy stubs */
 extern int an_hook_dummy(const char *regex);
