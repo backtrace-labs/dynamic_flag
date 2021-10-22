@@ -57,6 +57,19 @@
 	1)
 
 /**
+ * DF_DEFAULT_SLOW is semantically identical to DF_DEFAULT, but optimises
+ * for the flag being set to false.
+ *
+ * It is useful for code that is usually enabled, but should be
+ * most efficient when disabled.
+ */
+#define DF_DEFAULT_SLOW(KIND, NAME)					\
+	__builtin_expect(DYNAMIC_FLAG_IMPL(				\
+	    DYNAMIC_FLAG_VALUE_ACTIVE, DYNAMIC_FLAG_VALUE_ACTIVE, 0,	\
+	    KIND, NAME, __FILE__, __LINE__),				\
+	0)
+
+/**
  * DF_OPT (optional or opt-in) defines a dynamic boolean flag that
  * defaults to false, but is always true when the dynamic_flag library
  * does not run.
@@ -87,7 +100,7 @@
  * disabled by default in NDEBUG (release) builds.
  */
 #ifdef NDEBUG
-# define DF_DEBUG(NAME) DF_DEFAULT(debug, NAME)
+# define DF_DEBUG(NAME) DF_DEFAULT_SLOW(debug, NAME)
 #else
 # define DF_DEBUG(NAME) DF_FEATURE(debug, NAME)
 #endif

@@ -19,7 +19,7 @@ run_all(void)
 		printf("on:printf1\n");
 	}
 
-	if (DF_DEFAULT(on, printf2)) {
+	if (DF_DEFAULT_SLOW(on, printf2)) {
 		printf("on:printf2\n");
 	}
 
