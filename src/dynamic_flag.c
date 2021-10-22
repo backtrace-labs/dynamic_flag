@@ -336,13 +336,36 @@ amortize(const struct patch_list *records,
 	return;
 }
 
+/**
+ * Compiles `pattern` as a Posix extended regular expression that's
+ * implicitly anchored at the first character of the string (at the
+ * first character of the flag name)
+ */
+static int
+compile_regex(regex_t *regex, const char *pattern)
+{
+	char *to_free = NULL;
+	int r;
+
+	if (pattern != NULL && pattern[0] != '^') {
+		r = asprintf(&to_free, "^%s", pattern);
+		if (r < 0)
+			return r;
+		pattern = to_free;
+	}
+
+	r = regcomp(regex, pattern, REG_EXTENDED | REG_NOSUB);
+	free(to_free);
+	return r;
+}
+
 static int
 find_records(const char *pattern, struct patch_list *acc)
 {
 	regex_t regex;
 	size_t n = __stop_dynamic_flag_list - __start_dynamic_flag_list;
 
-	if (regcomp(&regex, pattern, REG_EXTENDED | REG_NOSUB) != 0) {
+	if (compile_regex(&regex, pattern) != 0) {
 		return -1;
 	}
 
@@ -365,7 +388,7 @@ find_records_kind(const void **start, const void **end, const char *pattern,
 	regex_t regex;
 	size_t n = end - start;
 
-	if (pattern != NULL && regcomp(&regex, pattern, REG_EXTENDED | REG_NOSUB) != 0) {
+	if (pattern != NULL && compile_regex(&regex, pattern) != 0) {
 		return -1;
 	}
 

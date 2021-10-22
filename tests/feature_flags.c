@@ -88,10 +88,10 @@ int main(int argc, char **argv)
 	wrapped_activate("^test:on:printf3");
 	run_all();
 
-	wrapped_deactivate("on:.*");
+	wrapped_deactivate(".*on:.*");
 	run_all();
 
-	wrapped_activate("^on:printf3");
+	wrapped_activate("on:printf3");
 	run_all();
 
 	wrapped_deactivate("feature_flag:.*");
