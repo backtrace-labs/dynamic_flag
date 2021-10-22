@@ -668,12 +668,3 @@ an_hook_init_lib(void)
 }
 
 #endif /* AN_HOOK_ENABLED */
-
-/* Utility function for utrace breakpoints. */
-void
-an_hook_utrace_entry(const char * name, ...)
-{
-
-	(void)name;
-	return;
-}

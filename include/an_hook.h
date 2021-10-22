@@ -297,6 +297,4 @@ int an_hook_rehook(const char *regex);
 #endif
 
 void an_hook_init_lib(void);
-
-void an_hook_utrace_entry(const char *name, ...);
 #endif /* !AN_HOOK_H */
