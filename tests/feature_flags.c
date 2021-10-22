@@ -1,47 +1,45 @@
 #include <stdio.h>
 
-#include "an_hook.h"
+#include "dynamic_flag.h"
 
 
 static void
 run_all(void)
 {
 
-	AN_HOOK(off, printf1) {
+	if (DF_OPT(off, printf1)) {
 		printf("off:printf1\n");
 	}
 
-	AN_HOOK(off, printf2) {
+	if (DF_OPT(off, printf2)) {
 		printf("off:printf2\n");
 	}
 
-	AN_HOOK_ON(on, printf1) {
+	if (DF_DEFAULT(on, printf1)) {
 		printf("on:printf1\n");
 	}
 
-	AN_HOOK_ON(on, printf2) {
+	if (DF_DEFAULT(on, printf2)) {
 		printf("on:printf2\n");
 	}
 
-	AN_HOOK_ON(on, printf3) {
+	if (DF_DEFAULT(on, printf3)) {
 		printf("on:printf3\n");
 	}
 
-	AN_HOOK(untouched, printf1) {
+	if (DF_OPT(untouched, printf1)) {
 		printf("untouched:printf1\n");
 	}
 
-	AN_HOOK_ON(untouched, printf2) {
+	if (DF_DEFAULT(untouched, printf2)) {
 		printf("untouched:printf2\n");
 	}
 
-	AN_HOOK_FLIP(feature_flag, default_on) {
-	} else {
+	if (DF_DEFAULT(feature_flag, default_on)) {
 		printf("feature_flag:default_on\n");
 	}
 
-	AN_HOOK_FLIP_OFF(feature_flag, default_off) {
-	} else {
+	if (DF_FEATURE(feature_flag, default_off)) {
 		printf("feature_flag:default_off\n");
 	}
 
@@ -53,7 +51,7 @@ wrapped_activate(const char *pat)
 {
 
 	printf("\nActivating %s\n", pat);
-	an_hook_activate(pat);
+	dynamic_flag_activate(pat);
 	return;
 }
 
@@ -62,7 +60,7 @@ wrapped_deactivate(const char *pat)
 {
 
 	printf("\nDeactivating %s\n", pat);
-	an_hook_deactivate(pat);
+	dynamic_flag_deactivate(pat);
 	return;
 }
 
@@ -74,7 +72,7 @@ int main(int argc, char **argv)
 
 	printf("Before init\n");
 	run_all();
-	an_hook_init_lib();
+	dynamic_flag_init_lib();
 
 	printf("\nInitial:\n");
 	run_all();
@@ -95,29 +93,29 @@ int main(int argc, char **argv)
 	run_all();
 
 	printf("\nActivating feature_flag\n");
-	an_hook_activate_kind(feature_flag, ".*");
+	dynamic_flag_activate_kind(feature_flag, ".*");
 	run_all();
 
 	printf("\nDeactivating feature_flag\n");
-	an_hook_deactivate_kind(feature_flag, ".*");
+	dynamic_flag_deactivate_kind(feature_flag, ".*");
 	run_all();
 
 	printf("\nUnhooking feature_flag:.*");
-	an_hook_unhook("feature_flag:.*");
+	dynamic_flag_unhook("feature_flag:.*");
 	wrapped_activate("feature_flag:.*");
 	run_all();
 
 	printf("\nDeactivating feature_flag:.*\n");
-	an_hook_deactivate_kind(feature_flag, ".*");
+	dynamic_flag_deactivate_kind(feature_flag, ".*");
 	run_all();
 
 	printf("\nRehooking feature_flag:.*");
-	an_hook_rehook("feature_flag:.*");
+	dynamic_flag_rehook("feature_flag:.*");
 	wrapped_activate("feature_flag:.*");
 	run_all();
 
 	printf("\nDeactivating feature_flag\n");
-	an_hook_deactivate_kind(feature_flag, ".*");
+	dynamic_flag_deactivate_kind(feature_flag, ".*");
 	run_all();
 
 	return 0;
