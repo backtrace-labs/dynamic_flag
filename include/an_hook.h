@@ -1,5 +1,4 @@
-#ifndef AN_HOOK_H
-#define AN_HOOK_H
+#pragma once
 
 #ifndef AN_HOOK_ENABLED
 # if defined(__GNUC__)
@@ -8,6 +7,21 @@
 #  define AN_HOOK_ENABLED 0
 # endif
 #endif
+
+inline int
+an_hook_dummy(const char *regex)
+{
+
+	(void)regex;
+	return 0;
+}
+
+inline void
+an_hook_init_lib_dummy(void)
+{
+
+	return;
+}
 
 #if !AN_HOOK_ENABLED
 
@@ -18,37 +32,11 @@
 #define AN_HOOK_FLIP_OFF(KIND, NAME) if (1)
 #define AN_HOOK_DUMMY(KIND) do { } while (0)
 
-static inline int
-an_hook_activate(const char *regex)
-{
-
-	(void)regex;
-	return 0;
-}
-
-static inline int
-an_hook_deactivate(const char *regex)
-{
-
-	(void)regex;
-	return 0;
-}
-
-static inline int
-an_hook_unhook(const char *regex)
-{
-
-	(void)regex;
-	return 0;
-}
-
-static inline int
-an_hook_rehook(const char *regex)
-{
-
-	(void)regex;
-	return 0;
-}
+#define an_hook_activate an_hook_dummy
+#define an_hook_deactivate an_hook_dummy
+#define an_hook_unhook an_hook_dummy
+#define an_hook_rehook an_hook_dummy
+#define an_hook_init_lib an_hook_init_lib_dummy
 
 #define an_hook_activate_kind(KIND, PATTERN) an_hook_activate((PATTERN))
 #define an_hook_deactivate_kind(KIND, PATTERN) an_hook_deactivate((PATTERN))
@@ -235,6 +223,40 @@ an_hook_rehook(const char *regex)
 	} while (0)
 
 /**
+ * @brief (de)activate all hooks of kind @a KIND; if @a PATTERN is
+ *  non-NULL, the hook names must match @a PATTERN as a regex.
+ */
+#define an_hook_activate_kind(KIND, PATTERN)				\
+	do {								\
+		int an_hook_activate_kind_inner(const void **start,	\
+		    const void **end, const char *regex);		\
+		extern const void *__start_an_hook_##KIND##_list[];	\
+		extern const void *__stop_an_hook_##KIND##_list[]; 	\
+									\
+		an_hook_activate_kind_inner(__start_an_hook_##KIND##_list, \
+		    __stop_an_hook_##KIND##_list,			\
+		    (PATTERN));						\
+	} while (0)
+
+#define an_hook_deactivate_kind(KIND, PATTERN)				\
+	do {								\
+		int an_hook_deactivate_kind_inner(const void **start,	\
+		    const void **end, const char *regex);		\
+		extern const void *__start_an_hook_##KIND##_list[];	\
+		extern const void *__stop_an_hook_##KIND##_list[]; 	\
+									\
+		an_hook_deactivate_kind_inner(__start_an_hook_##KIND##_list, \
+		    __stop_an_hook_##KIND##_list,			\
+		    (PATTERN));						\
+	} while (0)
+
+#ifndef DISABLE_DEBUG
+# define AN_HOOK_DEBUG(NAME) AN_HOOK_ON(debug, NAME)
+#else
+# define AN_HOOK_DEBUG(NAME) AN_HOOK_UNSAFE(debug, NAME)
+#endif
+
+/**
  * @brief activate all hooks that match @a regex, regardless of the kind.
  * @return negative on failure, 0 on success.
  */
@@ -262,39 +284,9 @@ int an_hook_unhook(const char *regex);
 int an_hook_rehook(const char *regex);
 
 /**
- * @brief (de)activate all hooks of kind @a KIND; if @a PATTERN is
- *  non-NULL, the hook names must match @a PATTERN as a regex.
+ * @brief initializes the an_hook subsystem.
+ *
+ * It is safe if useless to call this function multiple times.
  */
-#define an_hook_activate_kind(KIND, PATTERN)				\
-	do {								\
-		int an_hook_activate_kind_inner(const void **start,	\
-		    const void **end, const char *regex);		\
-		extern const void *__start_an_hook_##KIND##_list[];	\
-		extern const void *__stop_an_hook_##KIND##_list[]; 	\
-									\
-		an_hook_activate_kind_inner(__start_an_hook_##KIND##_list, \
-		    __stop_an_hook_##KIND##_list,			\
-		    (PATTERN));						\
-	} while (0)
-
-#define an_hook_deactivate_kind(KIND, PATTERN)				\
-	do {								\
-		int an_hook_deactivate_kind_inner(const void **start,	\
-		    const void **end, const char *regex);		\
-		extern const void *__start_an_hook_##KIND##_list[];	\
-		extern const void *__stop_an_hook_##KIND##_list[]; 	\
-									\
-		an_hook_deactivate_kind_inner(__start_an_hook_##KIND##_list, \
-		    __stop_an_hook_##KIND##_list,			\
-		    (PATTERN));						\
-	} while (0)
-#endif /* AN_HOOK_ENABLED */
-
-#ifndef DISABLE_DEBUG
-# define AN_HOOK_DEBUG(NAME) AN_HOOK_ON(debug, NAME)
-#else
-# define AN_HOOK_DEBUG(NAME) AN_HOOK_UNSAFE(debug, NAME)
-#endif
-
 void an_hook_init_lib(void);
-#endif /* !AN_HOOK_H */
+#endif /* AN_HOOK_ENABLED */

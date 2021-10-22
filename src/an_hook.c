@@ -17,6 +17,7 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+#include "an_hook.h"
 
 #include <assert.h>
 #include <dlfcn.h>
@@ -33,19 +34,11 @@
 
 #include <pthread.h>
 
-#include "an_hook.h"
-
-#if !AN_HOOK_ENABLED
-
 /* dummy stubs */
-void
-an_hook_init_lib(void)
-{
+extern int an_hook_dummy(const char *regex);
+extern void an_hook_init_lib_dummy(void);
 
-	return;
-}
-
-#else /* AN_HOOK_ENABLED */
+#if AN_HOOK_ENABLED
 
 struct patch_record {
 	void *hook;
