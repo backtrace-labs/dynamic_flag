@@ -27,6 +27,11 @@ run_all(void)
 		printf("on:printf3\n");
 	}
 
+	/* Catch unanchored regexes. */
+	if (DF_OPT(test, on:printf3)) {
+		printf("test:on:printf3\n");
+	}
+
 	if (DF_OPT(untouched, printf1)) {
 		printf("untouched:printf1\n");
 	}
@@ -80,10 +85,13 @@ int main(int argc, char **argv)
 	wrapped_activate("off:printf1");
 	run_all();
 
+	wrapped_activate("^test:on:printf3");
+	run_all();
+
 	wrapped_deactivate("on:.*");
 	run_all();
 
-	wrapped_activate("on:printf3");
+	wrapped_activate("^on:printf3");
 	run_all();
 
 	wrapped_deactivate("feature_flag:.*");
