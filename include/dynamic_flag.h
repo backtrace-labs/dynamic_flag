@@ -87,6 +87,14 @@
 	"or 2 (preferred asm-goto implementation)."
 #endif
 
+/*
+ * DYNAMIC_FLAG_CTL_INTERFACE=0 makes this header define the DF_* macros and
+ * none of the control functions.
+ */
+#ifndef DYNAMIC_FLAG_CTL_INTERFACE
+#define DYNAMIC_FLAG_CTL_INTERFACE 1
+#endif
+
 /**
  * DF_FEATURE defines a dynamic boolean flag that defaults to false,
  * and is always false when the dynamic_flag library does not run.
@@ -160,6 +168,7 @@
 # define DF_DEBUG(NAME) DF_FEATURE(debug, NAME)
 #endif
 
+#if DYNAMIC_FLAG_CTL_INTERFACE
 #if DYNAMIC_FLAG_IMPLEMENTATION_STYLE != 0
 /**
  * @brief (de)activate all flags of kind @a KIND; if @a PATTERN is
@@ -235,7 +244,8 @@ void dynamic_flag_init_lib(void);
 #define dynamic_flag_rehook dynamic_flag_dummy
 #define dynamic_flag_init_lib dynamic_flag_init_lib_dummy
 
-#endif
+#endif  /* DYNAMIC_FLAG_IMPLEMENTATION_STYLE */
+#endif  /* DYNAMIC_FLAG_CTL_INTERFACE */
 
 #if DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 0
 
@@ -386,6 +396,7 @@ void dynamic_flag_init_lib(void);
 #define DYNAMIC_FLAG_IMPL(DEFAULT, INITIAL, FLIPPED, KIND, NAME, FILE, LINE) \
 	DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED, KIND, NAME, FILE, LINE)
 
+#if DYNAMIC_FLAG_CTL_INTERFACE
 inline int
 dynamic_flag_dummy(const char *regex)
 {
@@ -400,3 +411,4 @@ dynamic_flag_init_lib_dummy(void)
 
 	return;
 }
+#endif  /* DYNAMIC_FLAG_CTL_INTERFACE */
