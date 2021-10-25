@@ -302,6 +302,32 @@ void dynamic_flag_init_lib(void);
 #define dynamic_flag_list dynamic_flag_list_state_dummy
 
 #endif  /* DYNAMIC_FLAG_IMPLEMENTATION_STYLE */
+
+inline int
+dynamic_flag_dummy(const char *regex)
+{
+
+	(void)regex;
+	return 0;
+}
+
+inline void
+dynamic_flag_init_lib_dummy(void)
+{
+
+	return;
+}
+
+inline long long
+dynamic_flag_list_state_dummy(const char *regex,
+    long long (*cb)(void *ctx, const struct dynamic_flag_state *), void *ctx)
+{
+
+	(void)regex;
+	(void)cb;
+	(void)ctx;
+	return 0;
+}
 #endif  /* DYNAMIC_FLAG_CTL_INTERFACE */
 
 #if DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 0
@@ -454,32 +480,3 @@ void dynamic_flag_init_lib(void);
 
 #define DYNAMIC_FLAG_IMPL(DEFAULT, INITIAL, FLIPPED, KIND, NAME, FILE, LINE, DOC) \
 	DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED, KIND, NAME, FILE, LINE, DOC)
-
-#if DYNAMIC_FLAG_CTL_INTERFACE
-inline int
-dynamic_flag_dummy(const char *regex)
-{
-
-	(void)regex;
-	return 0;
-}
-
-inline void
-dynamic_flag_init_lib_dummy(void)
-{
-
-	return;
-}
-
-inline long long
-dynamic_flag_list_state_dummy(const char *regex,
-    long long (*cb)(void *ctx, const struct dynamic_flag_state *), void *ctx)
-{
-
-	(void)regex;
-	(void)cb;
-	(void)ctx;
-	return 0;
-}
-#endif  /* DYNAMIC_FLAG_CTL_INTERFACE */
-

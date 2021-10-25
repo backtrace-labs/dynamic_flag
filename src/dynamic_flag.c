@@ -42,37 +42,95 @@ extern long long dynamic_flag_list_state_dummy(const char *regex,
     long long (*cb)(void *ctx, const struct dynamic_flag_state *), void *ctx);
 
 #if DYNAMIC_FLAG_IMPLEMENTATION_STYLE > 0
+
+/**
+ * Patch records are defined by inline assembly blocks in the
+ * `dynamic_flag_list` section.
+ *
+ * There is also a pointer to each record in the kind-specific
+ * `dynamic_flag_${KIND}_list` section.
+ *
+ * When a function with flags is inlined, each instantiation will have
+ * its own record.
+ */
 struct patch_record {
+	/*
+	 * Address of the instruction to patch.  For the asm goto
+	 * implementation (IMPLEMENTATION_STYLE == 2), that's also the
+	 * address of the opcode byte.  For the fallback
+	 * implementation, this could be a REX byte, and the immediate
+	 * byte is at the end of the instruction, so we have to scan
+	 * forward by one or two bytes.
+	 */
 	void *hook;
+
+	/*
+	 * The destination instruction when the hook instruction is a
+	 * `jmp` (for the asm goto implementation style), 0 otherwise.
+	 */
 	void *destination;
+
 	/*
 	 * The flag name as a C string, followed by a docstring; a
 	 * missing docstring is represented as an empty C string
 	 * (i.e., there's always a second NUL terminator).
 	 */
 	const char *name_doc;
+
+	/*
+	 * The value to patch at the hook when the library is
+	 * initialised.  This functionality is used for `DF_OPT`
+	 * flags, where we want the code enabled unconditionally if
+	 * the dynamic flag library can't reach the flags, and
+	 * otherwise disabled until explicitly turned enabled.
+	 */
 	uint8_t initial_opcode; /* initial value for fallback impl. */
+
+	/* 
+	 * Flipped records should enter the slow path (jmp to the
+	 * destination / set a non-zero immediate value) when their
+	 * flag is disabled, and stay on the fast path when it is
+	 * enabled.
+	 */
 	uint8_t flipped;
 	uint8_t padding[6];
-};
+} __attribute__((__packed__));
 
+/**
+ * Internal metadata for each patch record: current activation and
+ * unhook count.
+ *
+ * If `activation > 0`, the flag is enabled.  If `unhook > 0`, the
+ * flag is unhooked and `activation` should not be incremented.
+ */
 struct patch_count {
 	/* If a hook is unhook, do not increment its activation count. */
 	uint64_t activation;
 	uint64_t unhook;
 };
 
+/**
+ * We store pointers to patch records that match a given criterion in
+ * these patch lists.  There can never be more pointers than the total
+ * number of records.
+ */
 struct patch_list {
 	size_t size;
 	size_t capacity;
 	const struct patch_record *data[];
 };
 
+/**
+ * The patch_lock protects write access to the `patch_count` data and
+ * to the machine code itself.
+ */
 static pthread_mutex_t patch_lock = PTHREAD_MUTEX_INITIALIZER;
 
-/*
+/**
  * Hook records are in an array. For each hook record, count # of
  * activations and disable calls.
+ *
+ * This array is initialized on demand in `lock()`.
  */
 static struct {
 	struct patch_count *data;
@@ -83,6 +141,10 @@ extern const struct patch_record __start_dynamic_flag_list[], __stop_dynamic_fla
 
 static void init_all(void);
 
+/**
+ * Returns a new patch list that's correctly sized for the patch
+ * records the library is aware of.
+ */
 static struct patch_list *
 patch_list_create(void)
 {
@@ -117,6 +179,10 @@ patch_list_push(struct patch_list *list, const struct patch_record *record)
 	return;
 }
 
+/**
+ * Acquires the patch lock.  Initialises the `patch_count` array if
+ * necessary and the initial hook states.
+ */
 static void
 lock(void)
 {
@@ -162,6 +228,10 @@ dummy(void)
 #if DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 1
 #define HOOK_SIZE 3 /* REX byte + mov imm8 */
 
+/**
+ * Switches to the flag's slow path by updating a non-zero value in
+ * the `MOV` instruction's immediate field.
+ */
 static void
 patch(const struct patch_record *record)
 {
@@ -185,6 +255,10 @@ patch(const struct patch_record *record)
 	return;
 }
 
+/**
+ * Switches to the flag's fast path by updating a zero value in the
+ * `MOV` instruction's immediate field.
+ */
 static void
 unpatch(const struct patch_record *record)
 {
@@ -202,8 +276,11 @@ unpatch(const struct patch_record *record)
 	return;
 }
 #elif DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 2
-#define HOOK_SIZE 5
+#define HOOK_SIZE 5  /* jmp rel32 or testl %eax, imm. */
 
+/**
+ * Switches to the flag's slow path by setting the opcode to `jmp rel`.
+ */
 static void
 patch(const struct patch_record *record)
 {
@@ -221,6 +298,9 @@ patch(const struct patch_record *record)
 	return;
 }
 
+/**
+ * Switches to the flag's fast path by setting the opcode to `test`.
+ */
 static void
 unpatch(const struct patch_record *record)
 {
@@ -239,8 +319,12 @@ unpatch(const struct patch_record *record)
 }
 #endif
 
+/**
+ * Sets the flag's initial state to that configured in its patch
+ * record, and updates the patch's activation count accordingly.
+ */
 static void
-default_patch(const struct patch_record *record)
+initial_patch(const struct patch_record *record)
 {
 	size_t i;
 
@@ -267,6 +351,10 @@ default_patch(const struct patch_record *record)
 	return;
 }
 
+/**
+ * Enables a flag.  I.e., switches to the fast path if the record is
+ * `flipped`, and to the slow path otherwise.
+ */
 static void
 activate(const struct patch_record *record)
 {
@@ -281,6 +369,10 @@ activate(const struct patch_record *record)
 	return;
 }
 
+/**
+ * Disables a flag.  I.e., switches to the slow path if the record is
+ * `flipped`, and to the fast path otherwise.
+ */
 static void
 deactivate(const struct patch_record *record)
 {
@@ -295,6 +387,16 @@ deactivate(const struct patch_record *record)
 	return;
 }
 
+/**
+ * Invokes `cb` on a list of records sorted by hook instruction
+ * address.
+ *
+ * The hook instruction is on writable page(s) when `cb` is called,
+ * and quickly reset to read-only/executable.
+ *
+ * This pair of mprotect is slow, so `amortize` batches calls for
+ * contiguous pages.
+ */
 static void
 amortize(const struct patch_list *records,
     void (*cb)(const struct patch_record *))
@@ -347,7 +449,7 @@ amortize(const struct patch_list *records,
 }
 
 /**
- * Compiles `pattern` as a Posix extended regular expression that's
+ * Compiles `pattern` as a POSIX extended regular expression that's
  * implicitly anchored at the first character of the string (at the
  * first character of the flag name)
  */
@@ -369,6 +471,9 @@ compile_regex(regex_t *regex, const char *pattern)
 	return r;
 }
 
+/**
+ * Stores patch records that match `pattern` in `acc`.
+ */
 static int
 find_records(const char *pattern, struct patch_list *acc)
 {
@@ -391,6 +496,11 @@ find_records(const char *pattern, struct patch_list *acc)
 	return 0;
 }
 
+/**
+ * Stores patch records in the
+ * `__{start,stop}_dynamic_flag_${KIND}_list` array that match
+ * `pattern` in `acc`.
+ */
 static int
 find_records_kind(const void **start, const void **end, const char *pattern,
     struct patch_list *acc)
@@ -418,11 +528,14 @@ find_records_kind(const void **start, const void **end, const char *pattern,
 	return 0;
 }
 
+/**
+ * Compares `patch_record`s by `hook` address.
+ */
 static int
 cmp_patches(const void *x, const void *y)
 {
-	const struct patch_record * const *a = x;
-	const struct patch_record * const *b = y;
+	const struct patch_record *const *a = x;
+	const struct patch_record *const *b = y;
 
 	if ((*a)->hook == (*b)->hook) {
 		return 0;
@@ -431,6 +544,9 @@ cmp_patches(const void *x, const void *y)
 	return ((*a)->hook < (*b)->hook) ? -1 : 1;
 }
 
+/**
+ * Initializes the flags' states.
+ */
 static void
 init_all(void)
 {
@@ -442,23 +558,27 @@ init_all(void)
 	assert(r == 0 && "dynamic_flag init failed.");
 
 	qsort(acc->data, acc->size, sizeof(acc->data[0]), cmp_patches);
-	amortize(acc, default_patch);
+	amortize(acc, initial_patch);
 	patch_list_destroy(acc);
 	return;
 }
 
+/**
+ * Increments by one the activation count of all flags in `records`.
+ */
 static size_t
-activate_all(struct patch_list *arr)
+activate_all(struct patch_list *records)
 {
 	struct patch_list *to_patch;
 	size_t to_patch_count;
 
-	qsort(arr->data, arr->size, sizeof(struct patch_record *), cmp_patches);
+	qsort(records->data, records->size,
+	    sizeof(struct patch_record *), cmp_patches);
 
 	to_patch = patch_list_create();
 	lock();
-	for (size_t i = 0; i < arr->size; i++) {
-		const struct patch_record *record = arr->data[i];
+	for (size_t i = 0; i < records->size; i++) {
+		const struct patch_record *record = records->data[i];
 		size_t offset = record - __start_dynamic_flag_list;
 
 		if (counts.data[offset].unhook > 0) {
@@ -478,6 +598,9 @@ activate_all(struct patch_list *arr)
 	return to_patch_count;
 }
 
+/**
+ * Decrements by one the activation count of all flags in `records`.
+ */
 static size_t
 deactivate_all(struct patch_list *records)
 {
@@ -507,6 +630,9 @@ deactivate_all(struct patch_list *records)
 	return to_patch_count;
 }
 
+/**
+ * Decrements by one the unhook count of all flags in `records`.
+ */
 static size_t
 rehook_all(struct patch_list *records)
 {
@@ -526,6 +652,9 @@ rehook_all(struct patch_list *records)
 	return records->size;
 }
 
+/**
+ * Increments by one the unhook count of all flags in `records`.
+ */
 static size_t
 unhook_all(struct patch_list *records)
 {
@@ -623,11 +752,21 @@ out:
 	return r;
 }
 
+/**
+ * Compares patch records roughly alphabetically.
+ *
+ * Compares everything up to the list number (i.e., kind, name, file)
+ * with strcmp.
+ *
+ * If only one flag has a docstring, it compares lower.
+ *
+ * Otherwise, the flag with the lesser line number comes first.
+ */
 static int
 cmp_patches_alpha(const void *x, const void *y)
 {
-	const struct patch_record * const *a = x;
-	const struct patch_record * const *b = y;
+	const struct patch_record *const *a = x;
+	const struct patch_record *const *b = y;
 	const char *a_name = (*a)->name_doc;
 	const char *b_name = (*b)->name_doc;
 	const char *a_colon, *b_colon;
