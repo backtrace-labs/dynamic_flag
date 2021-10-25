@@ -1,0 +1,107 @@
+Before init
+off:printf1
+off:printf2
+on:printf1
+on:printf2
+on:printf3
+test:on:printf3
+untouched:printf1
+untouched:printf2
+feature_flag:default_on
+
+List all flags
+feature_flag:default_off@tests/feature_flags.c:55 (off): DF_FEATURE flags are classic feature flags: off initially and if the dynamic_flag machine can't find them, and the compiler expects them to be disabled
+feature_flag:default_on@tests/feature_flags.c:48 (on)
+none:dummy@src/dynamic_flag.c:158 (off): This dummy flag does nothing. It lets the dynamic_flag library compile even when no other flag is defined.
+off:printf1@tests/feature_flags.c:12 (off): DF_OPT flags are usually disabled, but should always be safe to enable
+off:printf2@tests/feature_flags.c:16 (off)
+on:printf1@tests/feature_flags.c:21 (on): DF_DEFAULT flags are enabled initially and when the library can't find them.
+on:printf2@tests/feature_flags.c:27 (on): DF_DEFAULT_SLOW flags are enabled like DF_DEFAULT, but instruct the compiler to expect them to be disabled.
+on:printf3@tests/feature_flags.c:31 (on)
+test:on:printf3@tests/feature_flags.c:36 (off)
+untouched:printf1@tests/feature_flags.c:40 (off)
+untouched:printf2@tests/feature_flags.c:44 (on)
+
+Initial:
+on:printf1
+on:printf2
+on:printf3
+untouched:printf2
+feature_flag:default_on
+
+Activating off:printf1
+off:printf1
+on:printf1
+on:printf2
+on:printf3
+untouched:printf2
+feature_flag:default_on
+
+Activating ^test:on:printf3
+off:printf1
+on:printf1
+on:printf2
+on:printf3
+test:on:printf3
+untouched:printf2
+feature_flag:default_on
+
+Deactivating .*on:.*
+off:printf1
+untouched:printf2
+feature_flag:default_on
+
+Activating on:printf3
+off:printf1
+on:printf3
+untouched:printf2
+feature_flag:default_on
+
+Deactivating feature_flag:.*
+off:printf1
+on:printf3
+untouched:printf2
+
+Activating feature_flag:default_off
+off:printf1
+on:printf3
+untouched:printf2
+feature_flag:default_off
+
+Activating feature_flag
+off:printf1
+on:printf3
+untouched:printf2
+feature_flag:default_on
+feature_flag:default_off
+
+Deactivating feature_flag
+off:printf1
+on:printf3
+untouched:printf2
+feature_flag:default_off
+
+Unhooking feature_flag:.*
+Activating feature_flag:.*
+off:printf1
+on:printf3
+untouched:printf2
+feature_flag:default_off
+
+Deactivating feature_flag:.*
+off:printf1
+on:printf3
+untouched:printf2
+
+Rehooking feature_flag:.*
+Activating feature_flag:.*
+off:printf1
+on:printf3
+untouched:printf2
+feature_flag:default_on
+feature_flag:default_off
+
+Deactivating feature_flag
+off:printf1
+on:printf3
+untouched:printf2
