@@ -543,7 +543,7 @@ unhook_all(struct patch_list *records)
 	return records->size;
 }
 
-int
+ssize_t
 dynamic_flag_activate(const char *regex)
 {
 	struct patch_list *acc;
@@ -556,13 +556,14 @@ dynamic_flag_activate(const char *regex)
 	}
 
 	activate_all(acc);
+	r = acc->size;
 
 out:
 	patch_list_destroy(acc);
 	return r;
 }
 
-int
+ssize_t
 dynamic_flag_deactivate(const char *regex)
 {
 	struct patch_list *acc;
@@ -575,13 +576,14 @@ dynamic_flag_deactivate(const char *regex)
 	}
 
 	deactivate_all(acc);
+	r = acc->size;
 
 out:
 	patch_list_destroy(acc);
 	return r;
 }
 
-int
+ssize_t
 dynamic_flag_unhook(const char *regex)
 {
 	struct patch_list *acc;
@@ -594,13 +596,14 @@ dynamic_flag_unhook(const char *regex)
 	}
 
 	unhook_all(acc);
+	r = acc->size;
 
 out:
 	patch_list_destroy(acc);
 	return r;
 }
 
-int
+ssize_t
 dynamic_flag_rehook(const char *regex)
 {
 	struct patch_list *acc;
@@ -613,6 +616,7 @@ dynamic_flag_rehook(const char *regex)
 	}
 
 	rehook_all(acc);
+	r = acc->size;
 
 out:
 	patch_list_destroy(acc);
@@ -752,7 +756,7 @@ dynamic_flag_list_fprintf_cb(void *ctx, const struct dynamic_flag_state *state)
 	return 0;
 }
 
-int
+ssize_t
 dynamic_flag_activate_kind_inner(const void **start, const void **end,
     const char *regex)
 {
@@ -766,13 +770,14 @@ dynamic_flag_activate_kind_inner(const void **start, const void **end,
 	}
 
 	activate_all(acc);
+	r = acc->size;
 
 out:
 	patch_list_destroy(acc);
 	return r;
 }
 
-int
+ssize_t
 dynamic_flag_deactivate_kind_inner(const void **start, const void **end,
     const char *regex)
 {
@@ -786,6 +791,7 @@ dynamic_flag_deactivate_kind_inner(const void **start, const void **end,
 	}
 
 	deactivate_all(acc);
+	r = acc->size;
 
 out:
 	patch_list_destroy(acc);

@@ -189,10 +189,11 @@
 /**
  * @brief (de)activate all flags of kind @a KIND; if @a PATTERN is
  *  non-NULL, the flag names must match @a PATTERN as a regex.
+ * @return the number of matched flags on success, negative on failure.
  */
 #define dynamic_flag_activate_kind(KIND, PATTERN)			\
 	do {								\
-		int dynamic_flag_activate_kind_inner(const void **start,\
+		ssize_t dynamic_flag_activate_kind_inner(const void **start,\
 		    const void **end, const char *regex);		\
 		extern const void *__start_dynamic_flag_##KIND##_list[];\
 		extern const void *__stop_dynamic_flag_##KIND##_list[]; \
@@ -205,7 +206,7 @@
 
 #define dynamic_flag_deactivate_kind(KIND, PATTERN)			\
 	do {								\
-		int dynamic_flag_deactivate_kind_inner(const void **start,\
+		ssize_t dynamic_flag_deactivate_kind_inner(const void **start,\
 		    const void **end, const char *regex);		\
 		extern const void *__start_dynamic_flag_##KIND##_list[];\
 		extern const void *__stop_dynamic_flag_##KIND##_list[]; \
@@ -218,30 +219,30 @@
 
 /**
  * @brief activate all flags that match @a regex, regardless of the kind.
- * @return negative on failure, 0 on success.
+ * @return the number of matched flags on success, negative on failure.
  */
-int dynamic_flag_activate(const char *regex);
+ssize_t dynamic_flag_activate(const char *regex);
 
 /**
  * @brief deactivate all flags that match @a regex, regardless of the kind.
- * @return negative on failure, 0 on success.
+ * @return the number of matched flags on success, negative on failure.
  */
-int dynamic_flag_deactivate(const char *regex);
+ssize_t dynamic_flag_deactivate(const char *regex);
 
 /**
  * @brief disable hooking for all flags that match @a regex, regardless of the kind.
- * @return negative on failure, 0 on success.
+ * @return the number of matched flags on success, negative on failure.
  *
  * If a flag is unhooked, activating that flag does nothing and does
  * not increment the activation count.
  */
-int dynamic_flag_unhook(const char *regex);
+ssize_t dynamic_flag_unhook(const char *regex);
 
 /**
  * @brief reenable hooking all flags that match @a regex, regardless of the kind.
- * @return negative on failure, 0 on success.
+ * @return the number of matched flags on success, negative on failure.
  */
-int dynamic_flag_rehook(const char *regex);
+ssize_t dynamic_flag_rehook(const char *regex);
 
 /**
  * Description for a given dynamic flag's state.
