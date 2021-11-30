@@ -23,6 +23,9 @@ dynamic_flag_lib = static_library('dynamic_flag', _dynamic_flag_src_files,
 libdynamic_flag_dep = declare_dependency(link_whole: dynamic_flag_lib,
 	include_directories: dynamic_flag_include_dir)
 
+libdynamic_flag_header_dep = declare_dependency(
+	include_directories: dynamic_flag_include_dir)
+
 executable('dynamic_flag_test_feature_flags', 'tests/feature_flags.c',
 	dependencies: [libdynamic_flag_dep],
 	link_language: 'c', install: false)
