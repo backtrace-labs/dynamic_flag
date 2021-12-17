@@ -10,11 +10,13 @@ evaluate any jump condition,[^second-order]
 [^second-order]:  The compiler must still consider the slow/unlikely path as reachable, so the second order impact on compiler optimisations often dominates the effect of this additional instruction.
 
 We write "C" in scare quotes because the code relies on
-[inline `asm goto`, a GCC extension](https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html#:~:text=6.47.2.7%20Goto%20Labels)
-[introduced in GCC 4.5](https://gcc.gnu.org/legacy-ml/gcc-patches/2009-07/msg01556.html)
-and [adopted by clang 9](https://reviews.llvm.org/D69876).
-There are fallback implementations, but they're primarily meant for
-static analysers, or to port code with flags disabled.
+[inline `asm goto`](https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html#:~:text=6.47.2.7%20Goto%20Labels),
+[an extension introduced in GCC 4.5](https://gcc.gnu.org/legacy-ml/gcc-patches/2009-07/msg01556.html)
+and [adopted by clang 9](https://reviews.llvm.org/D69876),
+and emits literal x86-64 machine code bytes.  There are fallback
+implementations, but they're primarily
+[meant for static analysers](https://github.com/backtrace-labs/dynamic_flag/blob/00381c2cab5c8628e6a7d18730a98f7d7e6712f2/include/dynamic_flag.h#L62),
+or [to fuse flags in safe states, at compile-time](https://github.com/backtrace-labs/dynamic_flag/blob/00381c2cab5c8628e6a7d18730a98f7d7e6712f2/include/dynamic_flag.h#L61).
 
 The library can be seen as a feature flag system, but its minimal
 runtime overhead coupled with the ability to flip flags at runtime
