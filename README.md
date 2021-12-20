@@ -46,7 +46,7 @@ if (DF_FEATURE(my_kind, flag_name)) {
 }
 ```
 
-creates a flag named `my_find:flag_name@[file]:[lineno]`.  The
+creates a flag named `my_kind:flag_name@[file]:[lineno]`.  The
 `DF_FEATURE` expression evaluates to true if the flag is enabled,
 and to false otherwise.  The compiler will assume that `DF_FEATURE()
 == false` during optimisation, and the generated code will have
