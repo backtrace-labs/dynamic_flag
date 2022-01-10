@@ -469,6 +469,9 @@ dynamic_flag_list_state_dummy(const char *regex,
 			 ".quad 3b\n\t"					\
 			 ".popsection"					\
 			 ::: "cc" : DYNAMIC_FLAG_IMPL_label);		\
+		/* Emulate Linux's `asm_volatile_goto`. */		\
+		asm("");						\
+									\
 		if (0) {						\
 		DYNAMIC_FLAG_IMPL_label: DYNAMIC_FLAG_IMPL_COLD;	\
 			r = 1;						\
