@@ -163,7 +163,7 @@
  */
 #define DYNAMIC_FLAG_DUMMY(KIND, ...)					\
 	do {								\
-	  if (DF_FEATURE(KIND, dummy, ##__VA_ARGS__)) {			\
+		if (DF_FEATURE(KIND, dummy, ##__VA_ARGS__)) {		\
 			asm volatile("");				\
 		}							\
 	} while (0)
@@ -441,7 +441,7 @@ dynamic_flag_list_state_dummy(const char *regex,
 #endif
 
 #define DYNAMIC_FLAG_IMPL_(DEFAULT, INITIAL, FLIPPED,			\
-    KIND, NAME, FILE, LINE, DOC)						\
+    KIND, NAME, FILE, LINE, DOC)					\
 	({								\
 		__label__ DYNAMIC_FLAG_IMPL_label;			\
 		unsigned char r = 0;					\
