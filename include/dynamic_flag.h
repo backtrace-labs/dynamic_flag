@@ -162,11 +162,7 @@
  * The second argument is an optional docstring.
  */
 #define DYNAMIC_FLAG_DUMMY(KIND, ...)					\
-	do {								\
-		if (DF_FEATURE(KIND, dummy, ##__VA_ARGS__)) {		\
-			asm volatile("");				\
-		}							\
-	} while (0)
+	((void)DF_FEATURE(KIND, dummy, ##__VA_ARGS__))
 
 /**
  * DF_DEBUG flags are enabled by default in regular builds, and
