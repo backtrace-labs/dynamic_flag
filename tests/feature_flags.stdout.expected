@@ -12,7 +12,7 @@ feature_flag:default_on
 List all flags
 feature_flag:default_off@tests/feature_flags.c:55 (off): DF_FEATURE flags are classic feature flags: off initially and if the dynamic_flag machine can't find them, and the compiler expects them to be disabled
 feature_flag:default_on@tests/feature_flags.c:48 (on)
-none:dummy@src/dynamic_flag.c:158 (off): This dummy flag does nothing. It lets the dynamic_flag library compile even when no other flag is defined.
+none:dummy@src/dynamic_flag.c:224 (off): This dummy flag does nothing. It lets the dynamic_flag library compile even when no other flag is defined.
 off:printf1@tests/feature_flags.c:12 (off): DF_OPT flags are usually disabled, but should always be safe to enable
 off:printf2@tests/feature_flags.c:16 (off)
 on:printf1@tests/feature_flags.c:21 (on): DF_DEFAULT flags are enabled initially and when the library can't find them.
