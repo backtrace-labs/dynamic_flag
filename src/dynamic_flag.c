@@ -883,15 +883,31 @@ out:
 ssize_t
 dynamic_flag_list_fprintf_cb(void *ctx, const struct dynamic_flag_state *state)
 {
+	char activation[32] = "off";
+	char unhook[64] = "";
 	FILE *stream = ctx ?: stderr;
 
 	if (state->duplicate == true)
 		return 0;
 
-	fprintf(stream, "%s (%s)%s%s\n",
-	    state->name, (state->activation > 0) ? "on":"off",
-	    (state->doc[0] == '\0') ? "" : ": ",
-	    state->doc);
+	if (state->activation > 0) {
+		int r;
+
+		r = snprintf(activation, sizeof(activation), "%" PRIu64 "",
+		    state->activation);
+		assert((size_t)r < sizeof(activation));
+	}
+
+	if (state->unhook > 0) {
+		int r;
+
+		r = snprintf(
+		    unhook, sizeof(unhook), ", unhook=%" PRIu64 "", state->unhook);
+		assert((size_t)r < sizeof(unhook));
+	}
+
+	fprintf(stream, "%s (%s%s)%s%s\n", state->name, activation, unhook,
+	    (state->doc[0] == '\0') ? "" : ": ", state->doc);
 	return 0;
 }
 
