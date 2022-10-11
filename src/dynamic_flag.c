@@ -27,6 +27,7 @@
 #include <limits.h>
 #include <pthread.h>
 #include <regex.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -427,9 +428,27 @@ amortize(const struct patch_list *records,
 		const struct patch_record *record = records->data[i];
 		uintptr_t begin_page = (uintptr_t)record->hook / page_size;
 		uintptr_t end_page = ((uintptr_t)record->hook + HOOK_SIZE - 1) / page_size;
+		/* The initial range is empty, and can always be extended. */
+		bool empty_range = first_page > last_page;
+		/*
+		 * Otherwise, we can extend the current range by up to
+		 * one page in either direction.  If begin/end page
+		 * fall in that extended range, we want to adjoin it
+		 * to the `[first_page, last_page]` range.  Limited
+		 * extension guarantees that we only mprotect adjacent
+		 * pages that we would have mprotect-ed anyway.
+		 *
+		 * There is potential for unsigned overflow in the
+		 * subtraction, but only for the zero page, which is
+		 * usually unmappable. If we do have hook instructions
+		 * on the zero page, the wraparound is defined
+		 * behaviour and will merely result in less
+		 * amortisation, which is still correct.
+		 */
+		bool can_extend = (first_page - 1) <= begin_page &&
+			end_page <= (last_page + 1);
 
-		if ((first_page - 1) <= begin_page ||
-		    end_page <= (last_page + 1)) {
+		if (empty_range || can_extend) {
 			if (begin_page < first_page) {
 				first_page = begin_page;
 			}
