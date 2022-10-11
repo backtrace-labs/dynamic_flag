@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 static __attribute__((noinline, cold)) void run_all_tail(void)
 {
@@ -87,9 +88,6 @@ int
 main(int argc, char **argv)
 {
 
-	(void)argc;
-	(void)argv;
-
 	printf("Before init\n");
 	/*
 	 * Expected:
@@ -106,6 +104,10 @@ main(int argc, char **argv)
 	 */
 	run_all();
 	dynamic_flag_init_lib();
+
+	if (argc > 1) {
+		dynamic_flag_set_minimal_write_mode(atoi(argv[1]));
+	}
 
 	printf("\nList all flags\n");
 	/*
