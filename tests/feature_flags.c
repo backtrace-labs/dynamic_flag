@@ -3,6 +3,30 @@
 #include <stddef.h>
 #include <stdio.h>
 
+static __attribute__((noinline, cold)) void run_all_tail(void)
+{
+	if (DF_OPT(untouched, printf1)) {
+		printf("untouched:printf1\n");
+	}
+
+	if (DF_DEFAULT(untouched, printf2)) {
+		printf("untouched:printf2\n");
+	}
+
+	if (DF_DEFAULT(feature_flag, default_on)) {
+		printf("feature_flag:default_on\n");
+	}
+
+	if (DF_FEATURE(feature_flag, default_off,
+	    "DF_FEATURE flags are classic feature flags: off initially "
+	    "and if the dynamic_flag machine can't find them, "
+	    "and the compiler expects them to be disabled")) {
+		printf("feature_flag:default_off\n");
+	}
+
+	return;
+}
+
 static void
 run_all(void)
 {
@@ -37,25 +61,7 @@ run_all(void)
 		printf("test:on:printf3\n");
 	}
 
-	if (DF_OPT(untouched, printf1)) {
-		printf("untouched:printf1\n");
-	}
-
-	if (DF_DEFAULT(untouched, printf2)) {
-		printf("untouched:printf2\n");
-	}
-
-	if (DF_DEFAULT(feature_flag, default_on)) {
-		printf("feature_flag:default_on\n");
-	}
-
-	if (DF_FEATURE(feature_flag, default_off,
-	    "DF_FEATURE flags are classic feature flags: off initially "
-	    "and if the dynamic_flag machine can't find them, "
-	    "and the compiler expects them to be disabled")) {
-		printf("feature_flag:default_off\n");
-	}
-
+	run_all_tail();
 	return;
 }
 
