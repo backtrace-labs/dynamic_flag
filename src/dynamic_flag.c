@@ -140,6 +140,12 @@ static struct {
 
 extern const struct patch_record __start_dynamic_flag_list[], __stop_dynamic_flag_list[];
 
+/**
+ * If true (non-zero), we try to avoid no-op stores (and hopefully
+ * reduce copy-on-write traffic).
+ */
+static int minimal_write_mode = 0;
+
 static void init_all(void);
 
 /**
@@ -226,6 +232,24 @@ dummy(void)
 	return;
 }
 
+/**
+ * Ensures `*dst == value` on exit.  If `minimal_write_mode != 0`,
+ * only writes when necessary (when `*dst != value` on entry).
+ *
+ * We use a pointer to volatile for `dst` to clearly foil fancy
+ * optimisations where the compiler might decide to assign
+ * `*dst = value` unconditionally.
+ */
+static void
+update_byte(volatile uint8_t *dst, uint8_t value)
+{
+	if (minimal_write_mode != 0 && *dst == value)
+		return;
+
+	*dst = value;
+	return;
+}
+
 #if DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 1
 #define HOOK_SIZE 3 /* REX byte + mov imm8 */
 
@@ -233,7 +257,7 @@ dummy(void)
  * Switches to the flag's slow path by updating a non-zero value in
  * the `MOV` instruction's immediate field.
  */
-static void
+static __attribute__((noinline)) void
 patch(const struct patch_record *record)
 {
 	uint8_t *address = record->hook;
@@ -252,7 +276,7 @@ patch(const struct patch_record *record)
 
 	assert((field[0] == DYNAMIC_FLAG_VALUE_ACTIVE) ||
 	    (field[0] == DYNAMIC_FLAG_VALUE_INACTIVE));
-	field[0] = DYNAMIC_FLAG_VALUE_ACTIVE;
+	update_byte(field, DYNAMIC_FLAG_VALUE_ACTIVE);
 	return;
 }
 
@@ -260,7 +284,7 @@ patch(const struct patch_record *record)
  * Switches to the flag's fast path by updating a zero value in the
  * `MOV` instruction's immediate field.
  */
-static void
+static __attribute__((noinline))  void
 unpatch(const struct patch_record *record)
 {
 	uint8_t *address = record->hook;
@@ -273,7 +297,7 @@ unpatch(const struct patch_record *record)
 
 	assert((field[0] == DYNAMIC_FLAG_VALUE_ACTIVE) ||
 	    (field[0] == DYNAMIC_FLAG_VALUE_INACTIVE));
-	field[0] = DYNAMIC_FLAG_VALUE_INACTIVE;
+	update_byte(field, DYNAMIC_FLAG_VALUE_INACTIVE);
 	return;
 }
 #elif DYNAMIC_FLAG_IMPLEMENTATION_STYLE == 2
@@ -282,7 +306,7 @@ unpatch(const struct patch_record *record)
 /**
  * Switches to the flag's slow path by setting the opcode to `jmp rel`.
  */
-static void
+static __attribute__((noinline))  void
 patch(const struct patch_record *record)
 {
 	uint8_t *address = record->hook;
@@ -295,14 +319,14 @@ patch(const struct patch_record *record)
 	assert((offset == (intptr_t)*target) &&
 	    "Target's offset should match with the hook destination.");
 
-	*address = 0xe9; /* jmp rel */
+	update_byte(address, 0xe9); /* jmp rel */
 	return;
 }
 
 /**
  * Switches to the flag's fast path by setting the opcode to `test`.
  */
-static void
+static __attribute__((noinline)) void
 unpatch(const struct patch_record *record)
 {
 	uint8_t *address = record->hook;
@@ -315,7 +339,7 @@ unpatch(const struct patch_record *record)
 	assert((offset == (intptr_t)*target) &&
 	    "Target's offset should match with the hook destination.");
 
-	*address = 0xa9; /* testl $..., %eax */
+	update_byte(address, 0xa9); /* testl $..., %eax */
 	return;
 }
 #endif
@@ -978,6 +1002,14 @@ dynamic_flag_init_lib(void)
 
 	lock();
 	unlock();
+	return;
+}
+
+void
+dynamic_flag_set_minimal_write_mode(bool is_minimal)
+{
+
+	minimal_write_mode = is_minimal;
 	return;
 }
 #endif /* DYNAMIC_FLAG_IMPLEMENTATION_STYLE > 0 */

@@ -285,6 +285,18 @@ ssize_t dynamic_flag_list_fprintf_cb(void *ctx, const struct dynamic_flag_state 
  * It is safe if useless to call this function multiple times.
  */
 void dynamic_flag_init_lib(void);
+
+/**
+ * @brief Updates the "minimal write" flag (false by default).
+ *
+ * When the "minimal mode" flag is true, the dynamic_flag library
+ * attempts to minimise writes to binary code, in order to avoid
+ * copy-on-write.  This flag is false by default: fewer code paths
+ * means fewer hidden bugs.
+ *
+ * It is safe to call this function multiple times.
+ */
+void dynamic_flag_set_minimal_write_mode(bool is_minimal);
 #else
 
 #define dynamic_flag_activate_kind(KIND, PATTERN) dynamic_flag_dummy((PATTERN))
@@ -294,6 +306,7 @@ void dynamic_flag_init_lib(void);
 #define dynamic_flag_deactivate dynamic_flag_dummy
 #define dynamic_flag_unhook dynamic_flag_dummy
 #define dynamic_flag_rehook dynamic_flag_dummy
+#define dynamic_flag_set_minimal_write_mode(MODE) ((MODE) ? dynamic_flag_init_lib_dummy() : (void)0)
 #define dynamic_flag_init_lib dynamic_flag_init_lib_dummy
 #define dynamic_flag_list dynamic_flag_list_state_dummy
 
